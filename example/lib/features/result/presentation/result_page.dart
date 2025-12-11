@@ -1,18 +1,17 @@
-// ignore_for_file: prefer_single_quotes, document_ignores, prefer_int_literals, eol_at_end_of_file
-
 import 'dart:convert';
 import 'package:get/get.dart';
 import 'package:flutter/material.dart';
-import 'package:usb_camera_plugin_example/core/constants/app/app_assets.dart';
-import 'package:usb_camera_plugin_example/core/widgets/inputs/send_text_field.dart';
-import 'package:usb_camera_plugin_example/features/body_area/controllers/bottom_sheet_controller.dart';
 import '../controller/result_controller.dart';
 import '../../../core/widgets/ultrascan4d.dart';
 import '../../body_area/widget/text_button.dart';
 import '../../../core/constants/ui/app_colors.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 import '../../../core/api/models/analysis_response.dart';
 import '../../../core/constants/ui/app_text_styles.dart';
 import '../../../core/widgets/background_container.dart';
+import 'package:usb_camera_plugin_example/core/constants/app/app_assets.dart';
+import 'package:usb_camera_plugin_example/core/widgets/inputs/send_text_field.dart';
+import 'package:usb_camera_plugin_example/features/body_area/controllers/bottom_sheet_controller.dart';
 
 class ResultPage extends StatelessWidget {
   const ResultPage({required this.analysisResponse, super.key});
@@ -132,20 +131,11 @@ class ResultPage extends StatelessWidget {
                           fontSize: 32,
                         ),
                       ),
-                      const SizedBox(height: 4),
-
-                      const SizedBox(height: 4),
-
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 16),
                       Obx(
-                        () => Text(
-                          controller.submitMessage.value.isEmpty
-                              ? 'submitting_result'.tr
-                              : controller.submitMessage.value,
-                          style: AppTextStyles.body2.copyWith(
-                            fontStyle: FontStyle.italic,
-                          ),
-                        ),
+                        () => controller.resultUrl.value.isEmpty
+                            ? const Center(child: CircularProgressIndicator())
+                            : WebResultView(url: controller.resultUrl.value),
                       ),
                     ],
                   ),
@@ -348,5 +338,21 @@ class _BottomSheetContent extends StatelessWidget {
         child: Text(text, style: AppTextStyles.title1.copyWith(fontSize: 12)),
       ),
     );
+  }
+}
+
+class WebResultView extends StatelessWidget {
+  final String url;
+
+  const WebResultView({required this.url, super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setBackgroundColor(Colors.transparent)
+      ..loadRequest(Uri.parse(url));
+
+    return SizedBox(height: 450, child: WebViewWidget(controller: controller));
   }
 }

@@ -40,6 +40,8 @@ dependencies:
   tflite_flutter: ^0.12.1
   image: ^3.3.0
   flutter_gemini: ^3.0.0
+  webview_flutter: ^4.13.0
+  webview_flutter_android: ^4.10.1
 dev_dependencies:
   integration_test:
     sdk: flutter

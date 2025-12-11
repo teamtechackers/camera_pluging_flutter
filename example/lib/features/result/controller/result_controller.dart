@@ -2,27 +2,25 @@ import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../core/api/api_endpoints.dart';
 import '../../../core/api/models/analysis_response.dart';
 import '../../../core/controllers/base_controller.dart';
 import '../../../core/controllers/selection_controller.dart';
-import '../../../core/services/ultrascan_result_service.dart';
 
 class ResultController extends BaseController {
   ResultController({required this.analysisResponse});
   final AnalysisResponse analysisResponse;
 
-  final RxString submitMessage = ''.obs;
-  final UltrascanResultService service = UltrascanResultService();
   static const String _macAddressKey = 'saved_mac_address';
-  RxString link = ''.obs;
+  RxString resultUrl = ''.obs;
 
   @override
   void onInit() {
     super.onInit();
-    _submitToMedicompras();
+    _buildResultUrl();
   }
 
-  Future<void> _submitToMedicompras() async {
+  Future<void> _buildResultUrl() async {
     try {
       final selection = Get.put(SelectionController());
       final zone = selection.selectedZone.value;
@@ -33,7 +31,6 @@ class ResultController extends BaseController {
       final prefs = await SharedPreferences.getInstance();
       final mac = prefs.getString(_macAddressKey);
       if (mac == null || mac.isEmpty) {
-        submitMessage.value = 'MAC not set';
         return;
       }
 
@@ -42,35 +39,18 @@ class ResultController extends BaseController {
       final thickNum = analysisResponse.analysis!.hairThickness?.value ?? 0.0;
       final thick = double.parse(thickNum.toStringAsFixed(2));
 
-      final resp = await service.submitResult(
-        macAddress: mac,
+      final url =
+          '${ApiEndpoints.deviceActivationBaseUrl}/UltraScan.php'
+          '?MAC_Address=$mac'
+          '&Piel=${piel.round()}'
+          '&Color=${color.round()}'
+          '&Thick=$thick'
+          '&Zone=$zone';
 
-        piel: piel.round(),
-        color: color.round(),
-
-        thick: thick,
-        zone: zone,
-      );
-      debugPrint(resp.toString());
-      final data = resp.data;
-      String message;
-      if (data is Map) {
-        message =
-            (data['Results'] ??
-                    data['results'] ??
-                    data['message'] ??
-                    data['Message'] ??
-                    data)
-                .toString();
-      } else if (data is String) {
-        message = data;
-      } else {
-        message = data.toString();
-      }
-      debugPrint(message);
-      submitMessage.value = message;
+      debugPrint('Result URL: $url');
+      resultUrl.value = url;
     } catch (e) {
-      submitMessage.value = 'Failed to send';
+      debugPrint('Error building URL: $e');
     }
   }
 }

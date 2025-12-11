@@ -1,7 +1,8 @@
 import 'package:get/get.dart';
 import 'package:flutter/material.dart';
+import 'package:webview_flutter/webview_flutter.dart';
+import 'package:webview_flutter_android/webview_flutter_android.dart';
 import 'package:usb_camera_plugin_example/routes/app_pages.dart';
-
 
 import 'core/api/api_client.dart';
 import 'core/constants/app/app_assets.dart';
@@ -12,6 +13,7 @@ import 'core/translations/app_translations.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  WebViewPlatform.instance = AndroidWebViewPlatform();
   await ApiClient().initialize();
   Get.put(LanguageController());
   runApp(const MyApp());

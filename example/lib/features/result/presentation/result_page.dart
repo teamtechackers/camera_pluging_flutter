@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:get/get.dart';
 import 'package:flutter/material.dart';
 import '../controller/result_controller.dart';
@@ -19,7 +21,7 @@ class ResultPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Delete existing controller if it exists to ensure fresh data
+    // Delete existing controller if it exists
     if (Get.isRegistered<ResultController>()) {
       Get.delete<ResultController>();
     }
@@ -29,141 +31,118 @@ class ResultPage extends StatelessWidget {
 
     return Scaffold(
       body: BackgroundContainer(
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
-              const SizedBox(height: 50),
+        child: Column(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                physics: const NeverScrollableScrollPhysics(),
+                child: Column(
+                  children: [
+                    const SizedBox(height: 50),
 
-              // const Align(
-              //   alignment: Alignment.topRight,
-              //   child: Padding(
-              //     padding: EdgeInsets.only(right: 18),
-              //     child: SettingIconWidget(),
-              //   ),
-              // ),
-              Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text('protocol'.tr, style: AppTextStyles.heading4),
-                  Transform.translate(
-                    offset: const Offset(0, -8),
-                    child: Text(
-                      'and_result'.tr,
-                      style: AppTextStyles.heading3.copyWith(
-                        color: AppColors.yellowColor,
-                      ),
+                    /// HEADER
+                    Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text('protocol'.tr, style: AppTextStyles.heading4),
+                        Transform.translate(
+                          offset: const Offset(0, -8),
+                          child: Text(
+                            'and_result'.tr,
+                            style: AppTextStyles.heading3.copyWith(
+                              color: AppColors.yellowColor,
+                            ),
+                          ),
+                        ),
+                        const Ultrascan4d(),
+                      ],
                     ),
-                  ),
-                  const Ultrascan4d(),
-                ],
-              ),
 
-              // Display Annotated Image with error handling
-              if (controller.analysisResponse.analysis?.annotatedImage != null)
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 10,
-                  ),
-                  child: AspectRatio(
-                    aspectRatio: 4 / 3,
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Image.memory(
-                        base64Decode(
-                          controller.analysisResponse.analysis!.annotatedImage!
-                              .split(',')
-                              .last,
+                    /// IMAGE
+                    if (controller.analysisResponse.analysis?.annotatedImage != null)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        child: AspectRatio(
+                          aspectRatio: 4 / 3,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.memory(
+                              base64Decode(
+                                controller.analysisResponse.analysis!.annotatedImage!.split(',').last,
+                              ),
+                              fit: BoxFit.cover,
+                              gaplessPlayback: true,
+                            ),
+                          ),
                         ),
-                        key: ValueKey(
-                          controller.analysisResponse.analysis!.annotatedImage,
+                      )
+                    else
+                      Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Container(
+                          height: 200,
+                          color: Colors.grey[300],
+                          child: const Center(
+                            child: Text("No detection image available"),
+                          ),
                         ),
-                        fit: BoxFit.cover,
-                        gaplessPlayback: true,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
-                            color: Colors.grey[300],
-                            child: const Center(
-                              child: Text(
-                                "Failed to load image",
-                                style: TextStyle(color: Colors.red),
+                      ),
+
+                    /// ANALYSIS SUMMARY
+                    if (controller.analysisResponse.analysis != null) ...[
+                      const SizedBox(height: 16),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'analysis_summary'.tr,
+                              style: AppTextStyles.heading4.copyWith(
+                                color: AppColors.whiteColor,
+                                fontSize: 32,
                               ),
                             ),
-                          );
-                        },
-                      ),
-                    ),
-                  ),
-                )
-              else
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Container(
-                    height: 200,
-                    color: Colors.grey[300],
-                    child: const Center(
-                      child: Text("No detection image available"),
-                    ),
-                  ),
-                ),
-              // Text('analysis_summary'.tr, style: AppTextStyles.heading4),
-
-              // Obx(
-              //   () => Padding(
-              //     padding: const EdgeInsets.all(20),
-              //     child: Text(
-              //       controller.resultLink.value,
-              //       style: AppTextStyles.body2,
-              //     ),
-              //   ),
-              // ),
-              if (controller.analysisResponse.analysis != null) ...[
-                const SizedBox(height: 16),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'analysis_summary'.tr,
-                        style: AppTextStyles.heading4.copyWith(
-                          color: AppColors.whiteColor,
-                          fontSize: 32,
+                            const SizedBox(height: 16),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 16),
-                      Obx(
-                        () => controller.resultUrl.value.isEmpty
-                            ? const Center(child: CircularProgressIndicator())
-                            : WebResultView(url: controller.resultUrl.value),
-                      ),
                     ],
-                  ),
-                ),
-              ],
-              const SizedBox(height: 20),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 30),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: CustomTextButton(
-                        text: 'ask_a_question'.tr,
-                        onTap: () {
-                          // controller.analysisResponse.analysis = null;
-                          _showAdvancedBottomSheet(context);
-                          // Get.back();
-                        },
-                        paddingHorizontal: 40,
-                        paddingVertical: 11,
+
+                    /// WEBVIEW
+                    Obx(
+                          () => controller.resultUrl.value.isEmpty
+                          ? const Center(child: CircularProgressIndicator())
+                          : Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: SizedBox(
+                          height: 450,
+                          child: WebResultView(url: controller.resultUrl.value),
+                        ),
                       ),
                     ),
+
                   ],
                 ),
               ),
-              const SizedBox(height: 50),
-            ],
-          ),
+            ),
+            // Button outside scrollview so it's always visible
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 20),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: CustomTextButton(
+                      text: 'ask_a_question'.tr,
+                      onTap: () => _showAdvancedBottomSheet(context),
+                      paddingHorizontal: 40,
+                      paddingVertical: 11,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -173,8 +152,6 @@ class ResultPage extends StatelessWidget {
 void _showAdvancedBottomSheet(BuildContext context) {
   final size = MediaQuery.of(context).size;
 
-  // Initialize controller for this bottom sheet instance
-  // Using a unique tag to avoid conflicts
   final tag = 'bottom_sheet_${DateTime.now().millisecondsSinceEpoch}';
   final controller = Get.put(BottomSheetController(), tag: tag);
 
@@ -189,8 +166,6 @@ void _showAdvancedBottomSheet(BuildContext context) {
       return _BottomSheetContent(size: size, controller: controller);
     },
   ).then((_) {
-    // Delay disposal to ensure any navigation completes first
-    // This prevents the TextEditingController from being disposed while still in use
     Future.delayed(const Duration(milliseconds: 500), () {
       if (Get.isRegistered<BottomSheetController>(tag: tag)) {
         Get.delete<BottomSheetController>(tag: tag);
@@ -222,7 +197,6 @@ class _BottomSheetContent extends StatelessWidget {
           borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
           children: [
             const SizedBox(height: 50),
             Padding(
@@ -231,82 +205,63 @@ class _BottomSheetContent extends StatelessWidget {
                 children: [
                   Text(
                     'how_can_i_help_scan'.tr,
-                    style: AppTextStyles.body2.copyWith(
-                      color: AppColors.whiteColor,
-                    ),
+                    style: AppTextStyles.body2.copyWith(color: AppColors.whiteColor),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 8),
                   Text(
                     'choose_question_or_formulate'.tr,
-                    style: AppTextStyles.title1.copyWith(
-                      color: AppColors.goldColor,
-                      fontSize: 12,
-                    ),
+                    style: AppTextStyles.title1.copyWith(color: AppColors.goldColor, fontSize: 12),
                     textAlign: TextAlign.center,
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 24),
-            // FAQ Section
             Flexible(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
                       'frequently_asked_questions'.tr,
-                      style: AppTextStyles.body2.copyWith(
-                        color: AppColors.whiteColor,
-                      ),
+                      style: AppTextStyles.body2.copyWith(color: AppColors.whiteColor),
                     ),
                     const SizedBox(height: 16),
-                    Obx(
-                      () => _buildFAQButton(
-                        context,
-                        'faq_question_1'.tr,
-                        () => controller.selectQuestion('faq_question_1'.tr),
-                        isLoading: controller.isLoading.value,
-                      ),
-                    ),
+                    Obx(() => _buildFAQButton(
+                      context,
+                      'faq_question_1'.tr,
+                          () => controller.selectQuestion('faq_question_1'.tr),
+                      isLoading: controller.isLoading.value,
+                    )),
                     const SizedBox(height: 12),
-                    Obx(
-                      () => _buildFAQButton(
-                        context,
-                        'faq_question_2'.tr,
-                        () => controller.selectQuestion('faq_question_2'.tr),
-                        isLoading: controller.isLoading.value,
-                      ),
-                    ),
+                    Obx(() => _buildFAQButton(
+                      context,
+                      'faq_question_2'.tr,
+                          () => controller.selectQuestion('faq_question_2'.tr),
+                      isLoading: controller.isLoading.value,
+                    )),
                     const SizedBox(height: 12),
-                    Obx(
-                      () => _buildFAQButton(
-                        context,
-                        'faq_question_3'.tr,
-                        () => controller.selectQuestion('faq_question_3'.tr),
-                        isLoading: controller.isLoading.value,
-                      ),
-                    ),
+                    Obx(() => _buildFAQButton(
+                      context,
+                      'faq_question_3'.tr,
+                          () => controller.selectQuestion('faq_question_3'.tr),
+                      isLoading: controller.isLoading.value,
+                    )),
                     const SizedBox(height: 12),
-                    Obx(
-                      () => _buildFAQButton(
-                        context,
-                        'faq_question_4'.tr,
-                        () => controller.selectQuestion('faq_question_4'.tr),
-                        isLoading: controller.isLoading.value,
-                      ),
-                    ),
+                    Obx(() => _buildFAQButton(
+                      context,
+                      'faq_question_4'.tr,
+                          () => controller.selectQuestion('faq_question_4'.tr),
+                      isLoading: controller.isLoading.value,
+                    )),
                     const SizedBox(height: 24),
                   ],
                 ),
               ),
             ),
-            // Input Field and Send Button
             Obx(
-              () => SendTextField(
+                  () => SendTextField(
                 controller: controller.questionController,
                 enabled: !controller.isLoading.value,
                 isLoading: controller.isLoading.value,
@@ -321,11 +276,11 @@ class _BottomSheetContent extends StatelessWidget {
   }
 
   Widget _buildFAQButton(
-    BuildContext context,
-    String text,
-    VoidCallback onTap, {
-    required bool isLoading,
-  }) {
+      BuildContext context,
+      String text,
+      VoidCallback onTap, {
+        required bool isLoading,
+      }) {
     return GestureDetector(
       onTap: isLoading ? null : onTap,
       child: Container(
@@ -353,6 +308,14 @@ class WebResultView extends StatelessWidget {
       ..setBackgroundColor(Colors.transparent)
       ..loadRequest(Uri.parse(url));
 
-    return SizedBox(height: 450, child: WebViewWidget(controller: controller));
+    return SizedBox(
+      height: 450,
+      child: WebViewWidget(
+        controller: controller,
+        gestureRecognizers: {
+          Factory<VerticalDragGestureRecognizer>(() => VerticalDragGestureRecognizer()),
+        },
+      ),
+    );
   }
 }

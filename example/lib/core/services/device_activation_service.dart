@@ -10,13 +10,16 @@ class DeviceActivationService {
 
   final Dio _dio;
 
-  /// Activate device using MAC address
+  /// Activate device using MAC address and device ID (code)
   /// Returns an [ActivationStatus] based on response `Estado`: Allow/Denied
   /// Throws DioException on transport-level failure (>=500 or network)
-  Future<ActivationStatus> activateDevice({required String macAddress}) async {
+  Future<ActivationStatus> activateDevice({
+    required String macAddress,
+    required String code,
+  }) async {
     try {
       final response = await _dio.get(
-        '${ApiEndpoints.deviceActivationBaseUrl}${ApiEndpoints.deviceActivation(macAddress: macAddress)}',
+        '${ApiEndpoints.deviceActivationBaseUrl}${ApiEndpoints.deviceActivation(macAddress: macAddress, code: code)}',
         options: Options(
           headers: {
             'Content-Type': 'application/json',

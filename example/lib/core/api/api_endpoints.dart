@@ -19,8 +19,10 @@ class ApiEndpoints {
 
   // Device activation endpoints
   static const String deviceActivationBaseUrl = 'http://www.medicompras.com';
-  static String deviceActivation({required String macAddress}) =>
-      '/UltraScan.php?Activacion=$macAddress';
+  static String deviceActivation({
+    required String macAddress,
+    required String code,
+  }) => '/UltraScan.php?Activacion=$macAddress&Code=$code';
 
   // UltraScan API endpoints
   static const String ultraScanApiBaseUrl = 'https://www.medicompras.com';

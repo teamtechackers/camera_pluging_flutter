@@ -1,5 +1,7 @@
 import 'dart:developer';
+import 'dart:io';
 
+import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:flutter/material.dart';
@@ -11,8 +13,10 @@ import '../../../core/services/device_activation_service.dart';
 
 class SettingController extends BaseController {
   static const String _macAddressKey = 'saved_mac_address';
+  static const String _deviceIdKey = 'saved_device_id';
 
   final DeviceActivationService _activationService = DeviceActivationService();
+  final DeviceInfoPlugin _deviceInfo = DeviceInfoPlugin();
   final TextEditingController macAddressController = TextEditingController();
   final GlobalKey<FormState> formKey = GlobalKey<FormState>();
 
@@ -46,6 +50,29 @@ class SettingController extends BaseController {
     }
   }
 
+  /// Get device ID automatically based on platform
+  Future<String> _getDeviceId() async {
+    try {
+      if (Platform.isAndroid) {
+        final androidInfo = await _deviceInfo.androidInfo;
+        return androidInfo.id;
+      } else if (Platform.isIOS) {
+        final iosInfo = await _deviceInfo.iosInfo;
+        return iosInfo.identifierForVendor ?? '';
+      } else {
+        if (kDebugMode) {
+          debugPrint('⚠️ Unsupported platform for device ID');
+        }
+        return '';
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('❌ Error getting device ID: $e');
+      }
+      return '';
+    }
+  }
+
   Future<void> _saveMacAddress(String macAddress) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -60,24 +87,56 @@ class SettingController extends BaseController {
     }
   }
 
+  Future<void> _saveDeviceId(String deviceId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_deviceIdKey, deviceId);
+      if (kDebugMode) {
+        debugPrint('💾 Saved device ID: $deviceId');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('❌ Error saving device ID: $e');
+      }
+    }
+  }
+
   Future<void> activateDevice() async {
     try {
       if (formKey.currentState != null && !formKey.currentState!.validate()) {
         return;
       }
-      showLoading();
 
       final macAddress = macAddressController.text.trim();
 
+      // Get device ID first (this will show loading)
+      final deviceId = await safeApiCall(() async {
+        return await _getDeviceId();
+      });
+
+      if (deviceId == null || deviceId.isEmpty) {
+        showError('Unable to retrieve device ID. Please try again.');
+        return;
+      }
+
+      if (kDebugMode) {
+        debugPrint('📱 Device ID: $deviceId');
+      }
+
+      // Make activation API call
       final result = await safeApiCall(() async {
         log('api called');
-        return _activationService.activateDevice(macAddress: macAddress);
+        return _activationService.activateDevice(
+          macAddress: macAddress,
+          code: deviceId,
+        );
       });
 
       if (result != null) {
-        // Save MAC address to SharedPreferences if activation is allowed
+        // Save MAC address and device ID to SharedPreferences if activation is allowed
         if (result == ActivationStatus.allowed) {
           await _saveMacAddress(macAddress);
+          await _saveDeviceId(deviceId);
         }
         showActivateDialog(status: result);
       } else {
@@ -85,9 +144,6 @@ class SettingController extends BaseController {
       }
     } catch (e) {
       handleApiError(e);
-      hideLoading();
-    } finally {
-      hideLoading();
     }
   }
 

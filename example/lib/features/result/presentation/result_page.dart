@@ -134,7 +134,7 @@ class ResultPage extends StatelessWidget {
                       ),
                       const SizedBox(height: 16),
                       Obx(
-                            () => controller.resultUrl.value.isEmpty
+                        () => controller.resultUrl.value.isEmpty
                             ? const Center(child: CircularProgressIndicator())
                             : WebResultView(url: controller.resultUrl.value),
                       ),
@@ -266,37 +266,37 @@ class _BottomSheetContent extends StatelessWidget {
                     ),
                     const SizedBox(height: 16),
                     Obx(
-                          () => _buildFAQButton(
+                      () => _buildFAQButton(
                         context,
                         'faq_question_1'.tr,
-                            () => controller.selectQuestion('faq_question_1'.tr),
+                        () => controller.selectQuestion('faq_question_1'.tr),
                         isLoading: controller.isLoading.value,
                       ),
                     ),
                     const SizedBox(height: 12),
                     Obx(
-                          () => _buildFAQButton(
+                      () => _buildFAQButton(
                         context,
                         'faq_question_2'.tr,
-                            () => controller.selectQuestion('faq_question_2'.tr),
+                        () => controller.selectQuestion('faq_question_2'.tr),
                         isLoading: controller.isLoading.value,
                       ),
                     ),
                     const SizedBox(height: 12),
                     Obx(
-                          () => _buildFAQButton(
+                      () => _buildFAQButton(
                         context,
                         'faq_question_3'.tr,
-                            () => controller.selectQuestion('faq_question_3'.tr),
+                        () => controller.selectQuestion('faq_question_3'.tr),
                         isLoading: controller.isLoading.value,
                       ),
                     ),
                     const SizedBox(height: 12),
                     Obx(
-                          () => _buildFAQButton(
+                      () => _buildFAQButton(
                         context,
                         'faq_question_4'.tr,
-                            () => controller.selectQuestion('faq_question_4'.tr),
+                        () => controller.selectQuestion('faq_question_4'.tr),
                         isLoading: controller.isLoading.value,
                       ),
                     ),
@@ -307,7 +307,7 @@ class _BottomSheetContent extends StatelessWidget {
             ),
             // Input Field and Send Button
             Obx(
-                  () => SendTextField(
+              () => SendTextField(
                 controller: controller.questionController,
                 enabled: !controller.isLoading.value,
                 isLoading: controller.isLoading.value,
@@ -322,11 +322,11 @@ class _BottomSheetContent extends StatelessWidget {
   }
 
   Widget _buildFAQButton(
-      BuildContext context,
-      String text,
-      VoidCallback onTap, {
-        required bool isLoading,
-      }) {
+    BuildContext context,
+    String text,
+    VoidCallback onTap, {
+    required bool isLoading,
+  }) {
     return GestureDetector(
       onTap: isLoading ? null : onTap,
       child: Container(
@@ -386,7 +386,7 @@ class _WebResultViewState extends State<WebResultView> {
                 document.body.style.webkitOverflowScrolling = 'none';
                 document.documentElement.style.webkitOverflowScrolling = 'none';
               ''');
-              
+
               // Check height multiple times as content may load progressively
               for (int i = 0; i < 3; i++) {
                 await Future.delayed(const Duration(milliseconds: 500));
@@ -394,7 +394,11 @@ class _WebResultViewState extends State<WebResultView> {
                   'Math.max(document.body.scrollHeight, document.body.offsetHeight, document.documentElement.clientHeight, document.documentElement.scrollHeight, document.documentElement.offsetHeight)',
                 );
                 if (height != null && mounted) {
-                  final heightValue = double.tryParse(height.toString().replaceAll(RegExp(r'[^0-9.]'), '')) ?? 150;
+                  final heightValue =
+                      double.tryParse(
+                        height.toString().replaceAll(RegExp(r'[^0-9.]'), ''),
+                      ) ??
+                      150;
                   if (mounted && heightValue > 0) {
                     setState(() {
                       // Set height exactly based on content - no limits, no scroll
@@ -404,7 +408,7 @@ class _WebResultViewState extends State<WebResultView> {
                   }
                 }
               }
-              
+
               if (mounted && isLoading) {
                 setState(() {
                   isLoading = false;
@@ -430,16 +434,14 @@ class _WebResultViewState extends State<WebResultView> {
       children: [
         SizedBox(
           height: contentHeight,
-          child: WebViewWidget(
-            controller: controller,
-          ),
+          child: WebViewWidget(controller: controller),
         ),
         if (isLoading)
           Positioned.fill(
             child: Container(
               color: Colors.transparent,
               child: const Center(
-                child: CircularProgressIndicator(),
+                child: CircularProgressIndicator(color: AppColors.goldColor),
               ),
             ),
           ),

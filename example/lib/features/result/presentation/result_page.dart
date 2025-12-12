@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/gestures.dart';
 import 'package:get/get.dart';
 import 'package:flutter/material.dart';
 import '../controller/result_controller.dart';
@@ -376,12 +375,16 @@ class _WebResultViewState extends State<WebResultView> {
           onPageFinished: (String url) async {
             // Get content height and adjust webview height - no scroll needed
             try {
-              // Disable scrolling first - show all content
+              // Disable scrolling completely - show all content without scroll
               await controller.runJavaScript('''
-                document.body.style.overflow = 'visible';
-                document.documentElement.style.overflow = 'visible';
+                document.body.style.overflow = 'hidden';
+                document.documentElement.style.overflow = 'hidden';
                 document.body.style.height = 'auto';
                 document.documentElement.style.height = 'auto';
+                document.body.style.touchAction = 'none';
+                document.documentElement.style.touchAction = 'none';
+                document.body.style.webkitOverflowScrolling = 'none';
+                document.documentElement.style.webkitOverflowScrolling = 'none';
               ''');
               
               // Check height multiple times as content may load progressively
@@ -429,9 +432,6 @@ class _WebResultViewState extends State<WebResultView> {
           height: contentHeight,
           child: WebViewWidget(
             controller: controller,
-            gestureRecognizers: {
-              Factory<VerticalDragGestureRecognizer>(() => VerticalDragGestureRecognizer()),
-            },
           ),
         ),
         if (isLoading)

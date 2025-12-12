@@ -75,13 +75,33 @@ class ScanController extends GetxController with WidgetsBindingObserver {
           status = await Permission.photos.status;
           if (status.isDenied) {
             final result = await Permission.photos.request();
+            if (result.isPermanentlyDenied) {
+              // Open app settings if permanently denied
+              await openAppSettings();
+              return false;
+            }
             return result.isGranted;
+          }
+          if (status.isPermanentlyDenied) {
+            // Open app settings if permanently denied
+            await openAppSettings();
+            return false;
           }
         } else {
           status = await Permission.storage.status;
           if (status.isDenied) {
             final result = await Permission.storage.request();
+            if (result.isPermanentlyDenied) {
+              // Open app settings if permanently denied
+              await openAppSettings();
+              return false;
+            }
             return result.isGranted;
+          }
+          if (status.isPermanentlyDenied) {
+            // Open app settings if permanently denied
+            await openAppSettings();
+            return false;
           }
         }
         return status.isGranted;

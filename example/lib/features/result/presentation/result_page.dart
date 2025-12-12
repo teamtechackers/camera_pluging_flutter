@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:flutter/material.dart';
 import '../controller/result_controller.dart';
@@ -14,20 +13,41 @@ import 'package:usb_camera_plugin_example/core/constants/app/app_assets.dart';
 import 'package:usb_camera_plugin_example/core/widgets/inputs/send_text_field.dart';
 import 'package:usb_camera_plugin_example/features/body_area/controllers/bottom_sheet_controller.dart';
 
-class ResultPage extends StatelessWidget {
+class ResultPage extends StatefulWidget {
   const ResultPage({required this.analysisResponse, super.key});
   final AnalysisResponse analysisResponse;
 
   @override
-  Widget build(BuildContext context) {
+  State<ResultPage> createState() => _ResultPageState();
+}
+
+class _ResultPageState extends State<ResultPage> {
+  late final ResultController controller;
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize controller only once when the widget is first created
     // Delete existing controller if it exists to ensure fresh data
     if (Get.isRegistered<ResultController>()) {
       Get.delete<ResultController>();
     }
-    final controller = Get.put(
-      ResultController(analysisResponse: analysisResponse),
+    controller = Get.put(
+      ResultController(analysisResponse: widget.analysisResponse),
     );
+  }
 
+  @override
+  void dispose() {
+    // Clean up controller when widget is disposed
+    if (Get.isRegistered<ResultController>()) {
+      Get.delete<ResultController>();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       body: BackgroundContainer(
         child: SingleChildScrollView(

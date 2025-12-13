@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:get/get.dart';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../controller/result_controller.dart';
 import '../../../core/widgets/ultrascan4d.dart';
 import '../../body_area/widget/text_button.dart';
@@ -372,80 +373,83 @@ class WebResultView extends StatefulWidget {
 }
 
 class _WebResultViewState extends State<WebResultView> {
-  late final WebViewController controller;
-  double contentHeight = 150; // Default height
-  bool isLoading = true; // Loading state
+  late final WebViewController _controller;
+  bool isLoading = true;
+  double contentHeight = 150;
 
   @override
   void initState() {
     super.initState();
-    controller = WebViewController()
+
+    _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(Colors.transparent)
+      // 🔹 Receive blob PDF from JS
+      ..addJavaScriptChannel(
+        'BlobPDF',
+        onMessageReceived: (JavaScriptMessage message) async {
+          final base64 = message.message;
+          final uri = Uri.parse('data:application/pdf;base64,$base64');
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+        },
+      )
       ..setNavigationDelegate(
         NavigationDelegate(
-          onPageStarted: (String url) {
-            // Show loading when page starts loading
-            if (mounted) {
-              setState(() {
-                isLoading = true;
-              });
-            }
-          },
-          onPageFinished: (String url) async {
-            // Get content height and adjust webview height - no scroll needed
-            try {
-              // Disable scrolling completely - show all content without scroll
-              await controller.runJavaScript('''
-                document.body.style.overflow = 'hidden';
-                document.documentElement.style.overflow = 'hidden';
-                document.body.style.height = 'auto';
-                document.documentElement.style.height = 'auto';
-                document.body.style.touchAction = 'none';
-                document.documentElement.style.touchAction = 'none';
-                document.body.style.webkitOverflowScrolling = 'none';
-                document.documentElement.style.webkitOverflowScrolling = 'none';
-              ''');
-
-              // Check height multiple times as content may load progressively
-              for (int i = 0; i < 3; i++) {
-                await Future.delayed(const Duration(milliseconds: 500));
-                final height = await controller.runJavaScriptReturningResult(
-                  'Math.max(document.body.scrollHeight, document.body.offsetHeight, document.documentElement.clientHeight, document.documentElement.scrollHeight, document.documentElement.offsetHeight)',
-                );
-                if (height != null && mounted) {
-                  final heightValue =
-                      double.tryParse(
-                        height.toString().replaceAll(RegExp(r'[^0-9.]'), ''),
-                      ) ??
-                      150;
-                  if (mounted && heightValue > 0) {
-                    setState(() {
-                      // Set height exactly based on content - no limits, no scroll
-                      contentHeight = heightValue;
-                      isLoading = false; // Hide loading when height is set
-                    });
-                  }
-                }
-              }
-
-              if (mounted && isLoading) {
-                setState(() {
-                  isLoading = false;
-                });
-              }
-            } catch (e) {
-              // Keep default height if JavaScript fails
-              if (mounted) {
-                setState(() {
-                  isLoading = false;
-                });
-              }
-            }
+          onPageStarted: (_) => setState(() => isLoading = true),
+          onPageFinished: (_) async {
+            await _injectBlobInterceptor();
+            await _updateHeight();
           },
         ),
       )
       ..loadRequest(Uri.parse(widget.url));
+  }
+
+  // 🔹 JS to intercept BLOB PDF
+  Future<void> _injectBlobInterceptor() async {
+    await _controller.runJavaScript('''
+      document.addEventListener('click', function(e) {
+        const link = e.target.closest('a');
+        if (!link) return;
+
+        if (link.href.startsWith('blob:')) {
+          e.preventDefault();
+
+          fetch(link.href)
+            .then(res => res.blob())
+            .then(blob => {
+              const reader = new FileReader();
+              reader.onloadend = function () {
+                const base64data = reader.result.split(',')[1];
+                BlobPDF.postMessage(base64data);
+              };
+              reader.readAsDataURL(blob);
+            });
+        }
+      }, true);
+    ''');
+  }
+
+  // 🔹 Auto height
+  Future<void> _updateHeight() async {
+    try {
+      final height = await _controller.runJavaScriptReturningResult(
+        'Math.max(document.body.scrollHeight, document.documentElement.scrollHeight)',
+      );
+
+      final h = double.tryParse(
+        height.toString().replaceAll(RegExp(r'[^0-9.]'), ''),
+      );
+
+      if (mounted && h != null) {
+        setState(() {
+          contentHeight = h;
+          isLoading = false;
+        });
+      }
+    } catch (_) {
+      setState(() => isLoading = false);
+    }
   }
 
   @override
@@ -454,15 +458,12 @@ class _WebResultViewState extends State<WebResultView> {
       children: [
         SizedBox(
           height: contentHeight,
-          child: WebViewWidget(controller: controller),
+          child: WebViewWidget(controller: _controller),
         ),
         if (isLoading)
-          Positioned.fill(
-            child: Container(
-              color: Colors.transparent,
-              child: const Center(
-                child: CircularProgressIndicator(color: AppColors.goldColor),
-              ),
+          const Positioned.fill(
+            child: Center(
+              child: CircularProgressIndicator(color: AppColors.goldColor),
             ),
           ),
       ],

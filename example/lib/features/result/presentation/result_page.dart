@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:get/get.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../controller/result_controller.dart';
 import '../../../core/widgets/ultrascan4d.dart';
 import '../../body_area/widget/text_button.dart';
@@ -555,7 +556,6 @@ class _WebResultViewState extends State<WebResultView> {
 
   @override
   Widget build(BuildContext context) {
-    log(widget.url);
     return Stack(
       children: [
         SizedBox(

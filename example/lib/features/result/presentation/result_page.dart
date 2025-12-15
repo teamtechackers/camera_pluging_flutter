@@ -1,7 +1,9 @@
 import 'dart:convert';
+import 'dart:developer';
+import 'dart:io';
 import 'package:get/get.dart';
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter/services.dart';
 import '../controller/result_controller.dart';
 import '../../../core/widgets/ultrascan4d.dart';
 import '../../body_area/widget/text_button.dart';
@@ -13,6 +15,7 @@ import '../../../core/widgets/background_container.dart';
 import 'package:usb_camera_plugin_example/core/constants/app/app_assets.dart';
 import 'package:usb_camera_plugin_example/core/widgets/inputs/send_text_field.dart';
 import 'package:usb_camera_plugin_example/features/body_area/controllers/bottom_sheet_controller.dart';
+import 'package:path_provider/path_provider.dart';
 
 class ResultPage extends StatefulWidget {
   const ResultPage({required this.analysisResponse, super.key});
@@ -373,6 +376,9 @@ class WebResultView extends StatefulWidget {
 }
 
 class _WebResultViewState extends State<WebResultView> {
+  static const MethodChannel _platformChannel = MethodChannel(
+    'usb_camera_plugin',
+  );
   late final WebViewController _controller;
   bool isLoading = true;
   double contentHeight = 150;
@@ -384,53 +390,148 @@ class _WebResultViewState extends State<WebResultView> {
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(Colors.transparent)
-      // 🔹 Receive blob PDF from JS
+      // 🔹 Receive Base64 PDF from JS
       ..addJavaScriptChannel(
         'BlobPDF',
         onMessageReceived: (JavaScriptMessage message) async {
-          final base64 = message.message;
-          final uri = Uri.parse('data:application/pdf;base64,$base64');
-          await launchUrl(uri, mode: LaunchMode.externalApplication);
+          try {
+            final base64 = message.message;
+            // Decode Base64 into raw bytes
+            final bytes = base64Decode(base64);
+
+            // Persist PDF to a shareable directory
+            // On Android: use temporary/cache directory so it's covered by FileProvider <cache-path>
+            // On other platforms: fall back to application documents directory
+            final dir = Platform.isAndroid
+                ? await getTemporaryDirectory()
+                : await getApplicationDocumentsDirectory();
+
+            final file = File(
+              '${dir.path}/Reporte_UltraScan_${DateTime.now().millisecondsSinceEpoch}.pdf',
+            );
+            await file.writeAsBytes(bytes, flush: true);
+
+            // Ask native Android code (MainActivity) to open this PDF using FileProvider
+            await _WebResultViewState._platformChannel.invokeMethod(
+              'openPdf',
+              file.path,
+            );
+          } catch (e, s) {
+            log('Failed to open PDF from WebView: $e\n$s');
+          }
         },
       )
       ..setNavigationDelegate(
         NavigationDelegate(
-          onPageStarted: (_) => setState(() => isLoading = true),
-          onPageFinished: (_) async {
+          // 🔹 Inject interceptor EARLY
+          onPageStarted: (_) async {
+            setState(() => isLoading = true);
             await _injectBlobInterceptor();
+          },
+          onPageFinished: (_) async {
             await _updateHeight();
+          },
+          onWebResourceError: (error) {
+            setState(() => isLoading = false);
           },
         ),
       )
       ..loadRequest(Uri.parse(widget.url));
   }
 
-  // 🔹 JS to intercept BLOB PDF
+  // 🔹 JS: Intercept BLOB PDFs and send to Flutter
   Future<void> _injectBlobInterceptor() async {
     await _controller.runJavaScript('''
-      document.addEventListener('click', function(e) {
-        const link = e.target.closest('a');
-        if (!link) return;
+      (function () {
+        if (window.__blobInterceptorInjected) return;
+        window.__blobInterceptorInjected = true;
 
-        if (link.href.startsWith('blob:')) {
-          e.preventDefault();
+        // ================================
+        // 1) INTERCEPT BLOB: URL CLICKS
+        // ================================
+        document.addEventListener('click', function(e) {
+          const link = e.target.closest('a');
+          if (!link || !link.href) return;
 
-          fetch(link.href)
-            .then(res => res.blob())
-            .then(blob => {
-              const reader = new FileReader();
-              reader.onloadend = function () {
-                const base64data = reader.result.split(',')[1];
-                BlobPDF.postMessage(base64data);
-              };
-              reader.readAsDataURL(blob);
-            });
+          if (link.href.startsWith('blob:')) {
+            e.preventDefault();
+
+            fetch(link.href)
+              .then(res => res.blob())
+              .then(blob => {
+                const reader = new FileReader();
+                reader.onloadend = function () {
+                  const base64data = reader.result.split(',')[1];
+                  BlobPDF.postMessage(base64data);
+                };
+                reader.readAsDataURL(blob);
+              });
+          }
+        }, true);
+
+        // ==========================================
+        // 2) PATCH jsPDF.save() TO WORK IN WEBVIEW
+        // ==========================================
+        function patchJsPDF() {
+          try {
+            // Try to resolve jsPDF constructor from common globals
+            var JsPDFCtor = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
+            if (!JsPDFCtor || JsPDFCtor.__ultraPatched) return;
+
+            var proto = JsPDFCtor.API || JsPDFCtor.prototype;
+            if (!proto) return;
+
+            // Avoid double-patching
+            if (proto.__originalSave) return;
+
+            proto.__originalSave = proto.save;
+            proto.save = function (fileName) {
+              try {
+                // Generate Data URI and send Base64 to Flutter
+                var dataUri = this.output('datauristring');
+                var base64 = String(dataUri).split(',')[1]; // strip "data:application/pdf;base64,"
+
+                if (window.BlobPDF && typeof BlobPDF.postMessage === 'function') {
+                  BlobPDF.postMessage(base64);
+                } else if (typeof proto.__originalSave === 'function') {
+                  // Fallback for normal browsers
+                  proto.__originalSave.call(this, fileName || 'document.pdf');
+                }
+              } catch (err) {
+                // If anything fails, fall back to original behavior
+                if (typeof proto.__originalSave === 'function') {
+                  proto.__originalSave.call(this, fileName || 'document.pdf');
+                }
+              }
+            };
+
+            JsPDFCtor.__ultraPatched = true;
+          } catch (e) {
+            // Silent fail – do not break page
+          }
         }
-      }, true);
+
+        // Try patching once DOM is ready
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', patchJsPDF);
+        } else {
+          patchJsPDF();
+        }
+
+        // Also poll a few times in case jsPDF loads late
+        var tries = 0;
+        var interval = setInterval(function () {
+          tries++;
+          if (window.jspdf || window.jsPDF || tries > 10) {
+            patchJsPDF();
+            clearInterval(interval);
+          }
+        }, 500);
+      })();
     ''');
   }
 
-  // 🔹 Auto height
+  // 🔹 Auto height calculation
   Future<void> _updateHeight() async {
     try {
       final height = await _controller.runJavaScriptReturningResult(
@@ -443,17 +544,18 @@ class _WebResultViewState extends State<WebResultView> {
 
       if (mounted && h != null) {
         setState(() {
-          contentHeight = h;
+          contentHeight = h.clamp(150, 3000);
           isLoading = false;
         });
       }
     } catch (_) {
-      setState(() => isLoading = false);
+      if (mounted) setState(() => isLoading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    log(widget.url);
     return Stack(
       children: [
         SizedBox(

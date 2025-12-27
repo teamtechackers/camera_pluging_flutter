@@ -145,6 +145,107 @@ object MediaUtils {
     }
 
     fun saveYuv2Jpeg(path: String, data: ByteArray, width: Int, height: Int): Boolean {
+        // First try to convert YUV to RGB manually for better color accuracy
+        val rgbData = try {
+            yuv420spToRgb(data, width, height)
+        } catch (e: Exception) {
+            Logger.w(TAG, "Manual YUV to RGB conversion failed, falling back to Android YuvImage", e)
+            null
+        }
+
+        val result = if (rgbData != null) {
+            // Use manually converted RGB data
+            saveRgbToJpeg(path, rgbData, width, height)
+        } else {
+            // Fallback to original Android method
+            saveYuvWithAndroidMethod(path, data, width, height)
+        }
+
+        return result
+    }
+
+    private fun yuv420spToRgb(yuv420sp: ByteArray, width: Int, height: Int): IntArray? {
+        try {
+            val frameSize = width * height
+            val rgb = IntArray(frameSize)
+
+            var yIndex = 0
+            var uvIndex = frameSize
+
+            var r: Int
+            var g: Int
+            var b: Int
+            var y: Int
+            var u: Int
+            var v: Int
+
+            for (j in 0 until height) {
+                for (i in 0 until width) {
+                    val yTemp = (yuv420sp[yIndex].toInt() and 0xff) - 16
+                    y = if (yTemp < 0) 0 else yTemp
+
+                    val uTemp = (yuv420sp[uvIndex].toInt() and 0xff) - 128
+                    u = if (uTemp < 0) 0 else uTemp
+
+                    val vTemp = (yuv420sp[uvIndex + 1].toInt() and 0xff) - 128
+                    v = if (vTemp < 0) 0 else vTemp
+
+                    y = y * 1192
+                    u = u - 128
+                    v = v - 128
+
+                    r = (y + 1634 * v) shr 10
+                    g = (y - 833 * v - 400 * u) shr 10
+                    b = (y + 2066 * u) shr 10
+
+                    r = when {
+                        r < 0 -> 0
+                        r > 255 -> 255
+                        else -> r
+                    }
+                    g = when {
+                        g < 0 -> 0
+                        g > 255 -> 255
+                        else -> g
+                    }
+                    b = when {
+                        b < 0 -> 0
+                        b > 255 -> 255
+                        else -> b
+                    }
+
+                    rgb[yIndex] = -0x1000000 or (r shl 16) or (g shl 8) or b
+
+                    yIndex++
+                    if (i and 1 == 1) uvIndex += 2
+                }
+                if (j and 1 == 1) uvIndex -= width
+            }
+            return rgb
+        } catch (e: Exception) {
+            Logger.e(TAG, "YUV420SP to RGB conversion failed", e)
+            return null
+        }
+    }
+
+    private fun saveRgbToJpeg(path: String, rgbData: IntArray, width: Int, height: Int): Boolean {
+        try {
+            val bitmap = android.graphics.Bitmap.createBitmap(width, height, android.graphics.Bitmap.Config.ARGB_8888)
+            bitmap.setPixels(rgbData, 0, width, 0, 0, width, height)
+
+            val file = File(path)
+            val fos = FileOutputStream(file)
+            val result = bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 95, fos)
+            fos.close()
+            bitmap.recycle()
+            return result
+        } catch (e: Exception) {
+            Logger.e(TAG, "saveRgbToJpeg failed", e)
+            return false
+        }
+    }
+
+    private fun saveYuvWithAndroidMethod(path: String, data: ByteArray, width: Int, height: Int): Boolean {
         val yuvImage = try {
             YuvImage(data, ImageFormat.NV21, width, height, null)
         } catch (e: Exception) {

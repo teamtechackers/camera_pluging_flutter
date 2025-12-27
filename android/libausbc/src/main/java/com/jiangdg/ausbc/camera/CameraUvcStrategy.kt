@@ -197,6 +197,10 @@ class CameraUvcStrategy(ctx: Context) : ICameraStrategy(ctx) {
             mUVCCamera?.autoFocus = true
             mUVCCamera?.autoWhiteBlance = true
             mUVCCamera?.startPreview()
+
+            // Apply color correction after starting preview
+            applyColorCorrection()
+
             mUVCCamera?.updateCameraParams()
             mIsPreviewing.set(true)
             getRequest()?.apply {
@@ -746,6 +750,28 @@ class CameraUvcStrategy(ctx: Context) : ICameraStrategy(ctx) {
      * Get hue
      */
     fun getHue() = mUVCCamera?.hue
+
+    /**
+     * Apply color correction for USB camera color issues
+     * This method attempts to fix common USB camera color space problems
+     */
+    fun applyColorCorrection() {
+        try {
+            // Set optimal camera parameters for better color reproduction
+            mUVCCamera?.autoWhiteBlance = true
+            mUVCCamera?.autoFocus = true
+
+            // Adjust brightness and contrast for better color balance
+            setBrightness(50)  // Balanced brightness
+            setContrast(50)    // Balanced contrast
+            setSaturation(60)  // Slightly higher saturation for vivid colors
+            setGamma(100)      // Gamma correction
+
+            Logger.i(TAG, "Applied color correction for USB camera")
+        } catch (e: Exception) {
+            Logger.w(TAG, "Failed to apply color correction", e)
+        }
+    }
 
     private fun getUsbDeviceListInternal(): MutableList<UsbDevice>? {
         return mUsbMonitor?.getDeviceList(arrayListOf<DeviceFilter>())?.let { devList ->

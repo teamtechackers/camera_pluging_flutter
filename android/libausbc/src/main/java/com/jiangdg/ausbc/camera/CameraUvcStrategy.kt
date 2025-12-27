@@ -752,22 +752,23 @@ class CameraUvcStrategy(ctx: Context) : ICameraStrategy(ctx) {
     fun getHue() = mUVCCamera?.hue
 
     /**
-     * Apply color correction for USB camera color issues
-     * This method attempts to fix common USB camera color space problems
+     * Apply color correction for USB camera - DISABLE AUTO WB and reduce brightness
+     * Maintains natural skin tones without excessive brightness/shininess
      */
     fun applyColorCorrection() {
         try {
-            // Set optimal camera parameters for better color reproduction
-            mUVCCamera?.autoWhiteBlance = true
+            // DISABLE auto white balance to prevent color shifting
+            mUVCCamera?.autoWhiteBlance = false
             mUVCCamera?.autoFocus = true
 
-            // Adjust brightness and contrast for better color balance
-            setBrightness(50)  // Balanced brightness
-            setContrast(50)    // Balanced contrast
-            setSaturation(60)  // Slightly higher saturation for vivid colors
-            setGamma(100)      // Gamma correction
+            // Reduce brightness significantly to match old app behavior
+            // Old app with sensor blocked had no software brightness boost
+            setBrightness(10)   // Much lower brightness - natural glow
+            setContrast(40)     // Moderate contrast for natural look
+            setSaturation(45)   // Balanced saturation - not too vivid
+            setGamma(80)        // Lower gamma for natural skin tones
 
-            Logger.i(TAG, "Applied color correction for USB camera")
+            Logger.i(TAG, "Applied natural color correction - AWB disabled, brightness reduced")
         } catch (e: Exception) {
             Logger.w(TAG, "Failed to apply color correction", e)
         }

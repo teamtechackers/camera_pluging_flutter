@@ -8,13 +8,12 @@ void main()
 {
     vec4 color = texture2D(uTextureSampler, vTextureCoord);
 
-    // Apply color correction for USB camera YUV issues
-    // Adjust saturation and color balance
+    // Natural color correction - avoid over-saturation and brightness
     float gray = dot(color.rgb, vec3(0.299, 0.587, 0.114));
-    vec3 adjusted = mix(vec3(gray), color.rgb, 1.1); // Slight saturation boost
+    vec3 adjusted = mix(vec3(gray), color.rgb, 1.02); // Minimal saturation boost
 
-    // Gamma correction to fix brightness/color temperature
-    adjusted = pow(adjusted, vec3(1.0/2.2));
+    // Mild gamma correction for natural skin tones
+    adjusted = pow(adjusted, vec3(1.0/1.8));
 
     gl_FragColor = vec4(adjusted, color.a);
 }

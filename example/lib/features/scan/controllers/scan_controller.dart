@@ -14,6 +14,8 @@ import 'package:usb_camera_plugin/usb_camera_plugin.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_exif_rotation/flutter_exif_rotation.dart';
+import 'package:image/image.dart' as img;
+import 'package:path_provider/path_provider.dart';
 
 class ScanController extends GetxController with WidgetsBindingObserver {
   final ImagePicker _picker = ImagePicker();
@@ -70,51 +72,39 @@ class ScanController extends GetxController with WidgetsBindingObserver {
         final androidInfo = await DeviceInfoPlugin().androidInfo;
         final sdkInt = androidInfo.version.sdkInt;
 
-        PermissionStatus status;
+        Permission permission;
         if (sdkInt >= 33) {
-          status = await Permission.photos.status;
-          if (status.isDenied) {
-            final result = await Permission.photos.request();
-            if (result.isPermanentlyDenied) {
-              // Open app settings if permanently denied
-              await openAppSettings();
-              return false;
-            }
-            return result.isGranted;
-          }
-          if (status.isPermanentlyDenied) {
-            // Open app settings if permanently denied
-            await openAppSettings();
-            return false;
-          }
+          permission = Permission.photos;
         } else {
-          status = await Permission.storage.status;
-          if (status.isDenied) {
-            final result = await Permission.storage.request();
-            if (result.isPermanentlyDenied) {
-              // Open app settings if permanently denied
-              await openAppSettings();
-              return false;
-            }
-            return result.isGranted;
-          }
-          if (status.isPermanentlyDenied) {
-            // Open app settings if permanently denied
-            await openAppSettings();
-            return false;
-          }
+          permission = Permission.storage;
         }
+
+        var status = await permission.status;
+        
+        if (status.isGranted) {
+          return true;
+        }
+
+        if (status.isPermanentlyDenied) {
+          await openAppSettings();
+          return false;
+        }
+
+        // Specifically request if denied or not determined
+        status = await permission.request();
+        
+        if (status.isPermanentlyDenied) {
+          await openAppSettings();
+          return false;
+        }
+
         return status.isGranted;
       } catch (e) {
         log('Failed to get gallery permission: $e');
         return false;
       }
     } else if (Platform.isIOS) {
-      final status = await Permission.photos.status;
-      if (status.isDenied) {
-        final result = await Permission.photos.request();
-        return result.isGranted;
-      }
+      final status = await Permission.photos.request();
       return status.isGranted;
     }
 
@@ -122,10 +112,9 @@ class ScanController extends GetxController with WidgetsBindingObserver {
   }
 
   Future<bool> requestCameraPermission() async {
-    final status = await Permission.camera.status;
-    if (status.isDenied) {
-      final result = await Permission.camera.request();
-      return result.isGranted;
+    final status = await Permission.camera.request();
+    if (status.isPermanentlyDenied) {
+      await openAppSettings();
     }
     return status.isGranted;
   }
@@ -156,7 +145,9 @@ class ScanController extends GetxController with WidgetsBindingObserver {
       );
 
       if (image != null) {
-        selectedImage.value = File(image.path);
+        File originalFile = File(image.path);
+        // Harmonize image before showing
+        selectedImage.value = await _harmonizeImage(originalFile);
         isFromUsb.value = false;
       }
     } catch (e) {
@@ -194,9 +185,11 @@ class ScanController extends GetxController with WidgetsBindingObserver {
       );
 
       if (image != null) {
-        selectedImage.value = File(image.path);
+        File originalFile = File(image.path);
+        // Harmonize image before showing
+        selectedImage.value = await _harmonizeImage(originalFile);
         isFromUsb.value = false;
-        log('Photo taken successfully');
+        log('Photo taken and harmonized successfully');
       }
     } catch (e) {
       log('Failed to take photo: $e');
@@ -248,7 +241,8 @@ class ScanController extends GetxController with WidgetsBindingObserver {
             print('✅ File size: ${await imageFile.length()} bytes');
           }
 
-          selectedImage.value = imageFile;
+          // Harmonize USB image before showing
+          selectedImage.value = await _harmonizeImage(imageFile);
           isFromUsb.value = true;
 
           if (kDebugMode) {
@@ -412,6 +406,82 @@ class ScanController extends GetxController with WidgetsBindingObserver {
       );
     } finally {
       isLoading.value = false;
+    }
+  }
+
+  Future<File> _harmonizeImage(File originalFile) async {
+    try {
+      // 1. Load image
+      final bytes = await originalFile.readAsBytes();
+      img.Image? image = img.decodeImage(bytes);
+      if (image == null) return originalFile;
+
+      // 2. Analyze Skin Tone (Logic from JS)
+      double rTotal = 0, gTotal = 0, bTotal = 0;
+      int count = 0;
+
+      // Sample pixels for speed (every 4th pixel)
+      for (int y = 0; y < image.height; y += 4) {
+        for (int x = 0; x < image.width; x += 4) {
+          int pixel = image.getPixel(x, y);
+          int r = img.getRed(pixel);
+          int g = img.getGreen(pixel);
+          int b = img.getBlue(pixel);
+
+          double luma = 0.299 * r + 0.587 * g + 0.114 * b;
+
+          // Exclude hair and extreme highlights
+          if (luma > 60 && luma < 230) {
+            if (r > g && r > b) {
+              rTotal += r;
+              gTotal += g;
+              bTotal += b;
+              count++;
+            }
+          }
+        }
+      }
+
+      int baseR = 200, baseG = 180, baseB = 160;
+      if (count > 0) {
+        baseR = (rTotal / count).round();
+        baseG = (gTotal / count).round();
+        baseB = (bTotal / count).round();
+      }
+      double baseLuma = 0.299 * baseR + 0.587 * baseG + 0.114 * baseB;
+
+      // 3. Apply Correction (Logic from JS)
+      const double strength = 0.5;
+      for (int y = 0; y < image.height; y++) {
+        for (int x = 0; x < image.width; x++) {
+          int pixel = image.getPixel(x, y);
+          int r = img.getRed(pixel);
+          int g = img.getGreen(pixel);
+          int b = img.getBlue(pixel);
+
+          double pixelLuma = 0.299 * r + 0.587 * g + 0.114 * b;
+
+          // Selective correction for highlights relative to base skin tone
+          if (pixelLuma > baseLuma) {
+            int newR = (r + (baseR - r) * strength).round();
+            int newG = (g + (baseG - g) * strength).round();
+            int newB = (b + (baseB - b) * strength).round();
+            image.setPixel(x, y, img.getColor(newR, newG, newB, img.getAlpha(pixel)));
+          }
+        }
+      }
+
+      // 4. Save to temp file
+      final tempDir = await getTemporaryDirectory();
+      final harmonizedFile = File(
+        '${tempDir.path}/harmonized_${DateTime.now().millisecondsSinceEpoch}.jpg',
+      );
+      await harmonizedFile.writeAsBytes(img.encodeJpg(image, quality: 90));
+
+      return harmonizedFile;
+    } catch (e) {
+      log('Image harmonization failed: $e');
+      return originalFile;
     }
   }
 }

@@ -9,7 +9,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../../core/widgets/custom_snackbar.dart';
 import '../../../core/services/analysis_service.dart';
 import 'package:device_info_plus/device_info_plus.dart';
-import 'package:flutter/foundation.dart' show kDebugMode;
+import 'package:flutter/foundation.dart' show kDebugMode, compute;
 import 'package:usb_camera_plugin/usb_camera_plugin.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -411,77 +411,158 @@ class ScanController extends GetxController with WidgetsBindingObserver {
 
   Future<File> _harmonizeImage(File originalFile) async {
     try {
-      // 1. Load image
-      final bytes = await originalFile.readAsBytes();
+      isLoading.value = true;
+      final tempDir = await getTemporaryDirectory();
+      
+      // Use compute to run processing in a background isolate
+      final File processedFile = await compute(_processImageLogic, {
+        'path': originalFile.path,
+        'tempDir': tempDir.path,
+      });
+      
+      return processedFile;
+    } catch (e) {
+      log('Image processing failed: $e');
+      return originalFile;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  // Static function for isolate processing
+  static File _processImageLogic(Map<String, dynamic> params) {
+    try {
+      final String path = params['path'];
+      final String tempDir = params['tempDir'];
+      
+      final bytes = File(path).readAsBytesSync();
       img.Image? image = img.decodeImage(bytes);
-      if (image == null) return originalFile;
+      if (image == null) return File(path);
 
-      // 2. Analyze Skin Tone (Logic from JS)
-      double rTotal = 0, gTotal = 0, bTotal = 0;
-      int count = 0;
+      // handling EXIF orientation so pixels align with visual expectation (like a browser)
+      image = img.bakeOrientation(image);
 
-      // Sample pixels for speed (every 4th pixel)
-      for (int y = 0; y < image.height; y += 4) {
-        for (int x = 0; x < image.width; x += 4) {
-          int pixel = image.getPixel(x, y);
-          int r = img.getRed(pixel);
-          int g = img.getGreen(pixel);
-          int b = img.getBlue(pixel);
+      // ==========================================
+      // FASE 1: LÓGICA DE CORRECCIÓN DE CÁMARA
+      // ==========================================
+      double sumR = 0, sumG = 0, sumB = 0, sumLuma = 0;
+      int totalPixels = image.width * image.height;
 
-          double luma = 0.299 * r + 0.587 * g + 0.114 * b;
+      // Analysis Loop - Phase 1 (All pixels)
+      for (int i = 0; i < totalPixels; i++) {
+        int pixel = image[i];
+        int r = img.getRed(pixel);
+        int g = img.getGreen(pixel);
+        int b = img.getBlue(pixel);
+        sumR += r;
+        sumG += g;
+        sumB += b;
+        sumLuma += (0.299 * r + 0.587 * g + 0.114 * b);
+      }
 
-          // Exclude hair and extreme highlights
-          if (luma > 60 && luma < 230) {
-            if (r > g && r > b) {
-              rTotal += r;
-              gTotal += g;
-              bTotal += b;
-              count++;
-            }
+      double avgR = sumR / totalPixels;
+      double avgG = sumG / totalPixels;
+      double avgB = sumB / totalPixels;
+      double avgLuma = sumLuma / totalPixels;
+
+      // Determine Gains (Target: R=G*1.15, B=G*0.85)
+      double rGain = 1.0;
+      double bGain = 1.0;
+      double targetR = avgG * 1.15;
+      double targetB = avgG * 0.85;
+
+      if (avgR < targetR) rGain = (targetR / avgR).clamp(1.0, 1.4);
+      if (avgB > targetB) bGain = (targetB / avgB).clamp(0.7, 1.0);
+
+      // Determine Exposure
+      double exposureMultiplier = 1.0;
+      const double lumaThreshold = 170.0;
+      if (avgLuma > lumaThreshold) {
+        double excess = avgLuma - lumaThreshold;
+        exposureMultiplier = (1.0 - (excess * 0.004)).clamp(0.75, 1.0);
+      }
+
+      // Application Loop Phase 1
+      for (int i = 0; i < totalPixels; i++) {
+        int pixel = image[i];
+        int r = img.getRed(pixel);
+        int g = img.getGreen(pixel);
+        int b = img.getBlue(pixel);
+        int a = img.getAlpha(pixel);
+
+        // Apply gains and exposure sequentially as per JS
+        double nr = r * rGain * exposureMultiplier;
+        double ng = g * exposureMultiplier;
+        double nb = b * bGain * exposureMultiplier;
+
+        image[i] = img.getColor(
+          nr.round().clamp(0, 255),
+          ng.round().clamp(0, 255),
+          nb.round().clamp(0, 255),
+          a,
+        );
+      }
+
+      // ==========================================
+      // FASE 2: ARMONIZACIÓN
+      // ==========================================
+      double rTotalH = 0, gTotalH = 0, bTotalH = 0;
+      int countH = 0;
+
+      // Analysis Loop Phase 2 (Sampling every 4th pixel to match JS i += 16)
+      for (int i = 0; i < totalPixels; i += 4) {
+        int pixel = image[i];
+        int r = img.getRed(pixel);
+        int g = img.getGreen(pixel);
+        int b = img.getBlue(pixel);
+        double luma = 0.299 * r + 0.587 * g + 0.114 * b;
+
+        if (luma > 60 && luma < 230) {
+          if (r > g && r > b) {
+            rTotalH += r;
+            gTotalH += g;
+            bTotalH += b;
+            countH++;
           }
         }
       }
 
       int baseR = 200, baseG = 180, baseB = 160;
-      if (count > 0) {
-        baseR = (rTotal / count).round();
-        baseG = (gTotal / count).round();
-        baseB = (bTotal / count).round();
+      if (countH > 0) {
+        baseR = (rTotalH / countH).round();
+        baseG = (gTotalH / countH).round();
+        baseB = (bTotalH / countH).round();
       }
-      double baseLuma = 0.299 * baseR + 0.587 * baseG + 0.114 * baseB;
+      double baseLumaH = 0.299 * baseR + 0.587 * baseG + 0.114 * baseB;
 
-      // 3. Apply Correction (Logic from JS)
+      // Application Loop Phase 2
       const double strength = 0.5;
-      for (int y = 0; y < image.height; y++) {
-        for (int x = 0; x < image.width; x++) {
-          int pixel = image.getPixel(x, y);
-          int r = img.getRed(pixel);
-          int g = img.getGreen(pixel);
-          int b = img.getBlue(pixel);
+      for (int i = 0; i < totalPixels; i++) {
+        int pixel = image[i];
+        int r = img.getRed(pixel);
+        int g = img.getGreen(pixel);
+        int b = img.getBlue(pixel);
+        int a = img.getAlpha(pixel);
 
-          double pixelLuma = 0.299 * r + 0.587 * g + 0.114 * b;
+        double pixelLuma = 0.299 * r + 0.587 * g + 0.114 * b;
 
-          // Selective correction for highlights relative to base skin tone
-          if (pixelLuma > baseLuma) {
-            int newR = (r + (baseR - r) * strength).round();
-            int newG = (g + (baseG - g) * strength).round();
-            int newB = (b + (baseB - b) * strength).round();
-            image.setPixel(x, y, img.getColor(newR, newG, newB, img.getAlpha(pixel)));
-          }
+        if (pixelLuma > baseLumaH) {
+          int nr = (r + (baseR - r) * strength).round().clamp(0, 255);
+          int ng = (g + (baseG - g) * strength).round().clamp(0, 255);
+          int nb = (b + (baseB - b) * strength).round().clamp(0, 255);
+          image[i] = img.getColor(nr, ng, nb, a);
         }
       }
 
-      // 4. Save to temp file
-      final tempDir = await getTemporaryDirectory();
+      // Final save
       final harmonizedFile = File(
-        '${tempDir.path}/harmonized_${DateTime.now().millisecondsSinceEpoch}.jpg',
+        '$tempDir/harmonized_${DateTime.now().millisecondsSinceEpoch}.jpg',
       );
-      await harmonizedFile.writeAsBytes(img.encodeJpg(image, quality: 90));
+      harmonizedFile.writeAsBytesSync(img.encodeJpg(image, quality: 90));
 
       return harmonizedFile;
     } catch (e) {
-      log('Image harmonization failed: $e');
-      return originalFile;
+      return File(params['path']);
     }
   }
 }

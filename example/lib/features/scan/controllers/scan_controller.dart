@@ -233,6 +233,7 @@ class ScanController extends GetxController with WidgetsBindingObserver {
         print('🔍 Checking for captured image...');
       }
 
+
       final imagePath = await _usbCameraPlugin.getLastCapturedImage();
 
       if (kDebugMode) {

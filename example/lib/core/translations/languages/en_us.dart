@@ -17,9 +17,9 @@ const Map<String, String> enUS = {
   'ultrascan': 'ULTRASCAN',
 
   // Pages
-  'face': 'Face',
-  'dorsal': 'Dorsal',
-  'frontal': 'Frontal',
+  'face': 'Siguiente',
+  'dorsal': 'Siguiente',
+  'frontal': 'Siguiente',
 
   // Face Parts
   'down': 'DOWN',

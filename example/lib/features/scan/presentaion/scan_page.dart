@@ -10,6 +10,7 @@ import '../../../core/constants/app/app_assets.dart';
 import '../../../core/widgets/background_container.dart';
 import '../../../core/widgets/setting_icon.dart';
 import '../../../core/widgets/ultrascan4d.dart';
+import '../../../routes/app_pages.dart';
 import '../controllers/scan_controller.dart';
 import '../widgets/circule_container.dart';
 
@@ -179,9 +180,9 @@ void _showAdvancedBottomSheet(BuildContext context) {
                     icon: AppAssets.cameraIcon,
                     title: 'camera'.tr,
                     iconSize: 40,
-                    onTap: () async {
-                      await controller.pickImageFromCamera();
-                      Get.back();
+                    onTap: () {
+                      Get.back(); // Close bottom sheet
+                      Get.toNamed(AppPages.cameraScreen);
                     },
                   ),
                   BottomSheetCircular(

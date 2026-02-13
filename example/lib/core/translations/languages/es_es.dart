@@ -18,9 +18,9 @@ const Map<String, String> esES = {
   'ultrascan': 'ULTRASCAN',
 
   // Pages
-  'face': 'CARA',
-  'dorsal': 'Dorsal',
-  'frontal': 'Frontal',
+  'face': 'SIGUIENTE',
+  'dorsal': 'Siguiente',
+  'frontal': 'Siguiente',
 
   // Face Parts
   'down': 'BOZO',

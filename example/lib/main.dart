@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 import 'package:usb_camera_plugin_example/routes/app_pages.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import 'core/api/api_client.dart';
 import 'core/constants/app/app_assets.dart';
@@ -80,10 +81,17 @@ class MyApp extends StatelessWidget {
       initialRoute: AppPages.initial,
       debugShowCheckedModeBanner: false,
       builder: (context, child) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          _precacheImages(context);
-        });
-        return child ?? const SizedBox.shrink();
+        return ScreenUtilInit(
+          designSize: const Size(360, 690),
+          minTextAdapt: true,
+          splitScreenMode: true,
+          builder: (context, _) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              _precacheImages(context);
+            });
+            return child ?? const SizedBox.shrink();
+          },
+        );
       },
     );
   }

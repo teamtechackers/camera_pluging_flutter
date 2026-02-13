@@ -42,15 +42,16 @@ class MainActivity : FlutterActivity() {
                             setDataAndType(uri, "application/pdf")
                             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                             addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY)
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) // Recommended for non-activity context starts 
                         }
 
-                        // Verify that there is an app to handle this intent
-                        val pm = packageManager
-                        if (intent.resolveActivity(pm) != null) {
+                        try {
                             startActivity(intent)
                             result.success(null)
-                        } else {
-                            result.error("NO_PDF_APP", "No application available to open PDF", null)
+                        } catch (e: android.content.ActivityNotFoundException) {
+                            result.error("NO_PDF_APP", "No application available to open PDF. Please install a PDF viewer.", null)
+                        } catch (e: Exception) {
+                            result.error("OPEN_PDF_ERROR", e.message, null)
                         }
                     } catch (e: Exception) {
                         result.error("OPEN_PDF_ERROR", e.message, null)

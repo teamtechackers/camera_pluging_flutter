@@ -73,6 +73,7 @@ const Map<String, String> esES = {
   'ask_a_question': 'HAZ UNA PREGUNTA',
   'analysis_summary': 'Analisis y Protocolos',
   'submitting_result': 'Enviando resultado...',
+  'processing_pdf': 'PROCESANDO...',
   'skin_color': 'Color de piel: @category (@value)',
   'hair_color': 'Color de cabello: @category (@value)',
   'hair_thickness': 'Grosor de cabello: @category (@value)',

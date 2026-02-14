@@ -13,6 +13,7 @@ class ResultController extends BaseController {
 
   static const String _macAddressKey = 'saved_mac_address';
   RxString resultUrl = ''.obs;
+  RxBool isDownloadingPdf = false.obs;
 
   @override
   void onInit() {

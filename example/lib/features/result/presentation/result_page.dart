@@ -165,6 +165,12 @@ class _ResultPageState extends State<ResultPage> {
                             : WebResultView(
                                 key: _webResultKey,
                                 url: controller.resultUrl.value,
+                                onDownloadStarted: () {
+                                  controller.isDownloadingPdf.value = true;
+                                },
+                                onDownloadFinished: () {
+                                  controller.isDownloadingPdf.value = false;
+                                },
                               ),
                       ),
                     ],
@@ -197,13 +203,19 @@ class _ResultPageState extends State<ResultPage> {
                 child: Row(
                   children: [
                     Expanded(
-                      child: CustomTextButton(
-                        text: 'download_pdf'.tr,
-                        onTap: () {
-                          _webResultKey.currentState?.triggerDownload();
-                        },
-                        paddingHorizontal: 40,
-                        paddingVertical: 11,
+                      child: Obx(
+                        () => CustomTextButton(
+                          text: controller.isDownloadingPdf.value
+                              ? 'processing_pdf'.tr
+                              : 'download_pdf'.tr,
+                          onTap: controller.isDownloadingPdf.value
+                              ? () {} // Disable or ignore while processing
+                              : () {
+                                  _webResultKey.currentState?.triggerDownload();
+                                },
+                          paddingHorizontal: 40,
+                          paddingVertical: 11,
+                        ),
                       ),
                     ),
                   ],
@@ -391,8 +403,15 @@ class _BottomSheetContent extends StatelessWidget {
 
 class WebResultView extends StatefulWidget {
   final String url;
+  final VoidCallback? onDownloadStarted;
+  final VoidCallback? onDownloadFinished;
 
-  const WebResultView({required this.url, super.key});
+  const WebResultView({
+    required this.url,
+    this.onDownloadStarted,
+    this.onDownloadFinished,
+    super.key,
+  });
 
   @override
   State<WebResultView> createState() => _WebResultViewState();
@@ -418,6 +437,7 @@ class _WebResultViewState extends State<WebResultView> {
         'BlobPDF',
         onMessageReceived: (JavaScriptMessage message) async {
           try {
+            widget.onDownloadFinished?.call();
             final base64 = message.message;
             // Decode Base64 into raw bytes
             final bytes = base64Decode(base64);
@@ -440,6 +460,7 @@ class _WebResultViewState extends State<WebResultView> {
               file.path,
             );
           } catch (e, s) {
+            widget.onDownloadFinished?.call();
             log('Failed to open PDF from WebView: $e\n$s');
           }
         },
@@ -464,6 +485,7 @@ class _WebResultViewState extends State<WebResultView> {
 
   // 🔹 Trigger PDF Download via JS
   void triggerDownload() {
+    widget.onDownloadStarted?.call();
     _controller.runJavaScript('''
       (function() {
         // Try to find the download button on the page

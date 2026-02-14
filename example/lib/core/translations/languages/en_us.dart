@@ -71,6 +71,7 @@ const Map<String, String> enUS = {
   'ask_a_question': 'ASK A QUESTION',
   'analysis_summary': 'Analysis summary',
   'submitting_result': 'Submitting result...',
+  'processing_pdf': 'PROCESSING...',
   'skin_color': 'Skin color: @category (@value)',
   'hair_color': 'Hair color: @category (@value)',
   'hair_thickness': 'Hair thickness: @category (@value)',

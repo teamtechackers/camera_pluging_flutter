@@ -50,13 +50,6 @@ class _ScanPageState extends State<ScanPage> {
               child: Column(
                 children: [
                   const SizedBox(height: 50),
-                  const Align(
-                    alignment: Alignment.topRight,
-                    child: Padding(
-                      padding: EdgeInsets.only(right: 18),
-                      child: SettingIconWidget(),
-                    ),
-                  ),
                   const SizedBox(height: 10),
                   const Ultrascan4d(),
                   const Spacer(),

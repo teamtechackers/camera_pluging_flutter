@@ -75,6 +75,7 @@ const Map<String, String> enUS = {
   'hair_color': 'Hair color: @category (@value)',
   'hair_thickness': 'Hair thickness: @category (@value)',
   'confidence_follicles': 'Confidence: @conf% | Follicles: @foll',
+  'download_pdf': 'DOWNLOAD PDF',
 
   // FAQ Bottom Sheet
   'how_can_i_help_scan': 'How can I help you with your scan?',

@@ -152,8 +152,6 @@ class _CameraScreenState extends State<CameraScreen> {
           // Bottom "Analyze" Button
           Positioned(bottom: 60.h, left: 0, right: 0, child: _buildAnalyzeButton()),
 
-          // Nav Bar Placeholder
-          Positioned(bottom: 20.h, left: 0, right: 0, child: _buildNavigationBar()),
 
           if (_isProcessing)
             Container(
@@ -189,16 +187,7 @@ class _CameraScreenState extends State<CameraScreen> {
               ],
             ),
           ),
-          Container(
-            height: 44.r,
-            width: 44.r,
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.05),
-              borderRadius: BorderRadius.circular(12.r),
-              border: Border.all(color: Colors.white.withOpacity(0.1)),
-            ),
-            child: const Icon(Icons.settings, color: Colors.white),
-          ),
+          SizedBox(width: 44.r), // Placeholder to keep title centered if needed, or just remove
         ],
       ),
     );

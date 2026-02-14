@@ -28,6 +28,7 @@ class ResultPage extends StatefulWidget {
 
 class _ResultPageState extends State<ResultPage> {
   late final ResultController controller;
+  final GlobalKey<_WebResultViewState> _webResultKey = GlobalKey<_WebResultViewState>();
 
   @override
   void initState() {
@@ -161,7 +162,10 @@ class _ResultPageState extends State<ResultPage> {
                       Obx(
                         () => controller.resultUrl.value.isEmpty
                             ? const Center(child: CircularProgressIndicator())
-                            : WebResultView(url: controller.resultUrl.value),
+                            : WebResultView(
+                                key: _webResultKey,
+                                url: controller.resultUrl.value,
+                              ),
                       ),
                     ],
                   ),
@@ -179,6 +183,24 @@ class _ResultPageState extends State<ResultPage> {
                           // controller.analysisResponse.analysis = null;
                           _showAdvancedBottomSheet(context);
                           // Get.back();
+                        },
+                        paddingHorizontal: 40,
+                        paddingVertical: 11,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 30),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: CustomTextButton(
+                        text: 'download_pdf'.tr,
+                        onTap: () {
+                          _webResultKey.currentState?.triggerDownload();
                         },
                         paddingHorizontal: 40,
                         paddingVertical: 11,
@@ -438,6 +460,35 @@ class _WebResultViewState extends State<WebResultView> {
         ),
       )
       ..loadRequest(Uri.parse(widget.url));
+  }
+
+  // 🔹 Trigger PDF Download via JS
+  void triggerDownload() {
+    _controller.runJavaScript('''
+      (function() {
+        // Try to find the download button on the page
+        // Common selectors for download buttons (adjust based on actual page structure if known)
+        const selectors = [
+          'button[id*="download"]',
+          'button[class*="download"]',
+          'a[id*="download"]',
+          'a[class*="download"]',
+           '[title*="Download"]',
+           '[aria-label*="Download"]'
+        ];
+        
+        for (const selector of selectors) {
+          const btn = document.querySelector(selector);
+          if (btn) {
+            btn.click();
+            return;
+          }
+        }
+        
+        // Fallback: If jsPDF is present, try calling save directly if we can find the instance
+        // But since we patched jsPDF.save, it should work if we just trigger the UI button.
+      })();
+    ''');
   }
 
   // 🔹 JS: Intercept BLOB PDFs and send to Flutter

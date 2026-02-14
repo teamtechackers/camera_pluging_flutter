@@ -35,3 +35,13 @@ subprojects {
 tasks.register<Delete>("clean") {
     delete(rootProject.layout.buildDirectory)
 }
+
+subprojects {
+    configurations.all {
+        resolutionStrategy {
+            force("androidx.test:runner:1.2.0")
+            force("androidx.test:rules:1.2.0")
+            force("androidx.test.espresso:espresso-core:3.2.0")
+        }
+    }
+}

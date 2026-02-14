@@ -155,7 +155,7 @@ class BodyAreaHome extends StatelessWidget {
                 ],
               ),
             ),
-            const Positioned(top: 50, right: 20, child: SettingIconWidget()),
+            // const Positioned(top: 50, right: 20, child: SettingIconWidget()),
           ],
         ),
       ),

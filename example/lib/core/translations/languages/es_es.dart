@@ -1,5 +1,6 @@
 const Map<String, String> esES = {
   'initializing': 'INICIALIZANDO',
+  'download_pdf': 'DESCARGAR PDF',
 
   // Common
   'ok': 'OK',

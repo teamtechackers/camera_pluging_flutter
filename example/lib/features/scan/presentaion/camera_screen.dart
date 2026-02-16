@@ -170,8 +170,8 @@ class _CameraScreenState extends State<CameraScreen> {
               const Center(child: CircularProgressIndicator()),
 
             /// ⭐ SCAN OVERLAY (FIXED — ALWAYS VISIBLE)
-            IgnorePointer(
-              child: Positioned.fill(
+            Positioned.fill(
+              child: IgnorePointer(
                 child: Padding(
                   padding: EdgeInsets.all(30.r),
                   child: Container(

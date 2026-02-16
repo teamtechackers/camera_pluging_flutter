@@ -6,8 +6,10 @@ import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image/image.dart' as img;
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
+
 import '../controllers/scan_controller.dart';
 
 class CameraScreen extends StatefulWidget {
@@ -81,9 +83,10 @@ class _CameraScreenState extends State<CameraScreen> {
       // 2. Compress Image
       final Directory tempDir = await getTemporaryDirectory();
       final String targetPath = "${tempDir.path}/compressed_${DateTime.now().millisecondsSinceEpoch}.jpg";
+      final File squareFile = await cropToSquare(originalFile);
 
       final XFile? compressedImage = await FlutterImageCompress.compressAndGetFile(
-        originalFile.absolute.path,
+        squareFile.absolute.path,
         targetPath,
         quality: 50, // Compress to 50% quality
       );
@@ -100,9 +103,9 @@ class _CameraScreenState extends State<CameraScreen> {
         final scanController = Get.find<ScanController>();
         scanController.selectedImage.value = compressedFile;
         scanController.isFromUsb.value = false;
-        
+
         // Use a short delay or ensure Get.back() targets the screen
-        Get.back(); 
+        Get.back();
       }
     } catch (e) {
       debugPrint("Processing error: $e");
@@ -112,6 +115,25 @@ class _CameraScreenState extends State<CameraScreen> {
         _isProcessing = false;
       });
     }
+  }
+
+  Future<File> cropToSquare(File file) async {
+    final bytes = await file.readAsBytes();
+    final img.Image? original = img.decodeImage(bytes);
+
+    if (original == null) return file;
+
+    int size = original.width < original.height ? original.width : original.height;
+
+    int offsetX = (original.width - size) ~/ 2;
+    int offsetY = (original.height - size) ~/ 2;
+
+    final img.Image cropped = img.copyCrop(original, offsetX, offsetY, size, size);
+
+    final croppedFile = File("${file.path}_square.jpg");
+    await croppedFile.writeAsBytes(img.encodeJpg(cropped, quality: 90));
+
+    return croppedFile;
   }
 
   @override
@@ -151,7 +173,6 @@ class _CameraScreenState extends State<CameraScreen> {
 
           // Bottom "Analyze" Button
           Positioned(bottom: 60.h, left: 0, right: 0, child: _buildAnalyzeButton()),
-
 
           if (_isProcessing)
             Container(

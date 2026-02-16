@@ -82,7 +82,7 @@ class _CameraScreenState extends State<CameraScreen> {
       final Directory tempDir = await getTemporaryDirectory();
       final String targetPath = "${tempDir.path}/compressed_${DateTime.now().millisecondsSinceEpoch}.jpg";
 
-      final File squareFile = await cropToSquare(originalFile);
+      final File squareFile = await cropToOverlaySquare(originalFile);
 
       final XFile? compressedImage = await FlutterImageCompress.compressAndGetFile(squareFile.absolute.path, targetPath, quality: 50);
 
@@ -106,19 +106,35 @@ class _CameraScreenState extends State<CameraScreen> {
     }
   }
 
-  Future<File> cropToSquare(File file) async {
+  Future<File> cropToOverlaySquare(File file) async {
     final bytes = await file.readAsBytes();
     final img.Image? original = img.decodeImage(bytes);
     if (original == null) return file;
 
-    int size = original.width < original.height ? original.width : original.height;
+    // FULL image size
+    final int imgWidth = original.width;
+    final int imgHeight = original.height;
 
-    int offsetX = (original.width - size) ~/ 2;
-    int offsetY = (original.height - size) ~/ 2;
+    // OVERLAY parameters (tumhare UI ke)
+    final double overlayPadding = 30; // 30.r padding
+    final double overlaySize = 300 - 2 * overlayPadding; // square box inside container
 
-    final img.Image cropped = img.copyCrop(original, offsetX, offsetY, size, size);
+    // PREVIEW container size
+    final double previewWidth = 300; // Container width
+    final double previewHeight = 300; // Container height
 
-    final croppedFile = File("${file.path}_square.jpg");
+    // Scale overlay to original image size
+    int cropX = ((overlayPadding / previewWidth) * imgWidth).round();
+    int cropY = ((overlayPadding / previewHeight) * imgHeight).round();
+    int cropSize = ((overlaySize / previewWidth) * imgWidth).round(); // assuming square
+
+    // Safety check
+    if (cropX + cropSize > imgWidth) cropSize = imgWidth - cropX;
+    if (cropY + cropSize > imgHeight) cropSize = imgHeight - cropY;
+
+    final img.Image cropped = img.copyCrop(original, cropX, cropY, cropSize, cropSize);
+
+    final croppedFile = File("${file.path}_square_overlay.jpg");
     await croppedFile.writeAsBytes(img.encodeJpg(cropped, quality: 90));
 
     return croppedFile;

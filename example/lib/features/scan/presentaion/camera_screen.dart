@@ -82,7 +82,7 @@ class _CameraScreenState extends State<CameraScreen> {
       final Directory tempDir = await getTemporaryDirectory();
       final String targetPath = "${tempDir.path}/compressed_${DateTime.now().millisecondsSinceEpoch}.jpg";
 
-      final File squareFile = await cropToOverlaySquareCorrect(originalFile);
+      final File squareFile = await cropToSquare(originalFile);
 
       final XFile? compressedImage = await FlutterImageCompress.compressAndGetFile(squareFile.absolute.path, targetPath, quality: 50);
 
@@ -106,42 +106,19 @@ class _CameraScreenState extends State<CameraScreen> {
     }
   }
 
-  Future<File> cropToOverlaySquareCorrect(File file) async {
+  Future<File> cropToSquare(File file) async {
     final bytes = await file.readAsBytes();
     final img.Image? original = img.decodeImage(bytes);
     if (original == null) return file;
 
-    final int imgWidth = original.width;
-    final int imgHeight = original.height;
+    int size = original.width < original.height ? original.width : original.height;
 
-    // UI container size
-    final double containerSize = 300; // Container width & height
-    final double overlayPadding = 30.r; // Padding from container
-    final double overlaySize = containerSize - 2 * overlayPadding; // inner square
+    int offsetX = (original.width - size) ~/ 2;
+    int offsetY = (original.height - size) ~/ 2;
 
-    // Camera preview size
-    final double previewWidth = _controller!.value.previewSize!.width;
-    final double previewHeight = _controller!.value.previewSize!.height;
+    final img.Image cropped = img.copyCrop(original, offsetX, offsetY, size, size);
 
-    // Fit scaling (FittedBox fit: BoxFit.cover)
-    final double scaleX = imgWidth / previewHeight; // note: rotated
-    final double scaleY = imgHeight / previewWidth;
-
-    int cropX = (overlayPadding * scaleX).round();
-    int cropY = (overlayPadding * scaleY).round();
-    int cropSizeX = (overlaySize * scaleX).round();
-    int cropSizeY = (overlaySize * scaleY).round();
-
-    // Use min to keep square crop
-    int cropSize = cropSizeX < cropSizeY ? cropSizeX : cropSizeY;
-
-    // Safety
-    if (cropX + cropSize > imgWidth) cropX = imgWidth - cropSize;
-    if (cropY + cropSize > imgHeight) cropY = imgHeight - cropSize;
-
-    final img.Image cropped = img.copyCrop(original, cropX, cropY, cropSize, cropSize);
-
-    final croppedFile = File("${file.path}_overlay_correct.jpg");
+    final croppedFile = File("${file.path}_square.jpg");
     await croppedFile.writeAsBytes(img.encodeJpg(cropped, quality: 90));
 
     return croppedFile;

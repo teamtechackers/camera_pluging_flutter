@@ -35,6 +35,9 @@ class CameraRender(context: Context) : AbstractFboRender(context) {
     private var mStMatrix = FloatArray(16)
     private var mMVPMatrix = FloatArray(16)
     private var mOESTextureId: Int = -1
+    private var mCameraWidth: Int = 0
+    private var mCameraHeight: Int = 0
+    private var mRotateAngle: Int = 0
 
     override fun init() {
         mOESTextureId = createOESTexture()
@@ -57,8 +60,14 @@ class CameraRender(context: Context) : AbstractFboRender(context) {
 
     override fun getFragmentSourceId(): Int = R.raw.camera_fragment
 
+    fun setCameraSize(width: Int, height: Int) {
+        this.mCameraWidth = width
+        this.mCameraHeight = height
+        setMVPMatrix(mRotateAngle)
+    }
+
     fun setRotateAngle(type: RotateType) {
-        val angle = when (type) {
+        mRotateAngle = when (type) {
             RotateType.ANGLE_90 -> 90
             RotateType.ANGLE_180 -> 180
             RotateType.ANGLE_270 -> 270
@@ -66,7 +75,7 @@ class CameraRender(context: Context) : AbstractFboRender(context) {
             RotateType.FLIP_LEFT_RIGHT -> -180
             else -> 0
         }
-        setMVPMatrix(angle)
+        setMVPMatrix(mRotateAngle)
     }
 
     fun setTransformMatrix(matrix: FloatArray) {
@@ -75,6 +84,26 @@ class CameraRender(context: Context) : AbstractFboRender(context) {
 
     private fun setMVPMatrix(angle: Int): FloatArray {
         Matrix.setIdentityM(mMVPMatrix, 0)
+        
+        // 1. Handle scaling for center crop if ratios differ
+        if (mCameraWidth > 0 && mCameraHeight > 0 && mWidth > 0 && mHeight > 0) {
+            val cameraRatio = mCameraWidth.toFloat() / mCameraHeight
+            val viewportRatio = mWidth.toFloat() / mHeight
+            
+            if (cameraRatio > viewportRatio) {
+                // Camera is wider than viewport (e.g. 4:3 camera in 1:1 viewport)
+                // Scale X to crop sides
+                val scaleX = cameraRatio / viewportRatio
+                Matrix.scaleM(mMVPMatrix, 0, scaleX, 1.0f, 1.0f)
+            } else if (cameraRatio < viewportRatio) {
+                // Viewport is wider than camera (e.g. 16:9 viewport for 4:3 camera)
+                // Scale Y to crop top/bottom
+                val scaleY = viewportRatio / cameraRatio
+                Matrix.scaleM(mMVPMatrix, 0, 1.0f, scaleY, 1.0f)
+            }
+        }
+
+        // 2. Handle rotation
         when (angle) {
             -90 -> {
                 // 上下翻转 (绕x轴180度)
@@ -95,10 +124,10 @@ class CameraRender(context: Context) : AbstractFboRender(context) {
             else -> {
                 // 旋转画面（绕z轴）
                 val radius = (angle * Math.PI / 180.0).toFloat()
-                mMVPMatrix[0] *= cos(radius.toDouble()).toFloat()
-                mMVPMatrix[1] += (-sin(radius.toDouble())).toFloat()
-                mMVPMatrix[4] += sin(radius.toDouble()).toFloat()
-                mMVPMatrix[5] *= cos(radius.toDouble()).toFloat()
+                // Use rotateM instead of manual for consistency with scaleM
+                if (angle != 0) {
+                    Matrix.rotateM(mMVPMatrix, 0, angle.toFloat(), 0f, 0f, 1f)
+                }
             }
         }
         return mMVPMatrix

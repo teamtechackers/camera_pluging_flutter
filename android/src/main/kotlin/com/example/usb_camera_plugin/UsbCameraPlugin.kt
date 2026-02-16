@@ -29,7 +29,7 @@ class UsbCameraPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
             // 🎥 Direct camera launch - skip CameraActivity
             val intent = Intent()
             intent.setClassName(
-              "com.jiangdg.ausbc",  // Example app package
+              it.packageName,
               "com.jiangdg.demo.MainActivity"  // Full camera UI
             )
             it.startActivity(intent)

@@ -151,11 +151,14 @@ class _ResultPageState extends State<ResultPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'analysis_summary'.tr,
-                        style: AppTextStyles.heading4.copyWith(
-                          color: AppColors.whiteColor,
-                          fontSize: 32,
+                      Align(
+                        alignment: Alignment.center,
+                        child: Text(
+                          'analysis_summary'.tr,
+                          style: AppTextStyles.heading4.copyWith(
+                            color: AppColors.whiteColor,
+                            fontSize: 22,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -165,6 +168,7 @@ class _ResultPageState extends State<ResultPage> {
                             : WebResultView(
                                 key: _webResultKey,
                                 url: controller.resultUrl.value,
+                                annotatedImage: controller.analysisResponse.analysis?.annotatedImage,
                                 onDownloadStarted: () {
                                   controller.isDownloadingPdf.value = true;
                                 },
@@ -403,11 +407,13 @@ class _BottomSheetContent extends StatelessWidget {
 
 class WebResultView extends StatefulWidget {
   final String url;
+  final String? annotatedImage;
   final VoidCallback? onDownloadStarted;
   final VoidCallback? onDownloadFinished;
 
   const WebResultView({
     required this.url,
+    this.annotatedImage,
     this.onDownloadStarted,
     this.onDownloadFinished,
     super.key,
@@ -436,9 +442,14 @@ class _WebResultViewState extends State<WebResultView> {
       ..addJavaScriptChannel(
         'BlobPDF',
         onMessageReceived: (JavaScriptMessage message) async {
+          final msg = message.message;
+          if (msg.startsWith('LOG: ')) {
+            log('WebView: ${msg.substring(5)}');
+            return;
+          }
           try {
             widget.onDownloadFinished?.call();
-            final base64 = message.message;
+            final base64 = msg;
             // Decode Base64 into raw bytes
             final bytes = base64Decode(base64);
 
@@ -543,45 +554,98 @@ class _WebResultViewState extends State<WebResultView> {
           }
         }, true);
 
+        function log(m) {
+          if (window.BlobPDF) BlobPDF.postMessage('LOG: ' + m);
+          console.log(m);
+        }
+
         // ==========================================
         // 2) PATCH jsPDF.save() TO WORK IN WEBVIEW
         // ==========================================
         function patchJsPDF() {
           try {
-            // Try to resolve jsPDF constructor from common globals
             var JsPDFCtor = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
-            if (!JsPDFCtor || JsPDFCtor.__ultraPatched) return;
+            if (!JsPDFCtor) {
+               log("jsPDF not found yet");
+               return;
+            }
+            if (JsPDFCtor.__ultraPatched) return;
 
             var proto = JsPDFCtor.API || JsPDFCtor.prototype;
             if (!proto) return;
-
-            // Avoid double-patching
             if (proto.__originalSave) return;
 
+            log("Patching jsPDF.save()");
             proto.__originalSave = proto.save;
             proto.save = function (fileName) {
+              log("jsPDF.save() interrupted. Adding image...");
               try {
-                // Generate Data URI and send Base64 to Flutter
-                var dataUri = this.output('datauristring');
-                var base64 = String(dataUri).split(',')[1]; // strip "data:application/pdf;base64,"
+                const imageBase64 = "${widget.annotatedImage}";
+                if (imageBase64 && imageBase64 !== "null" && imageBase64 !== "undefined") {
+                    const rawBase64 = imageBase64.includes(',') ? imageBase64.split(',')[1] : imageBase64;
+                    
+                    // 1. Get current page background color if possible, or use dark default
+                    let r=0, g=0, b=0;
+                    try {
+                        const bg = window.getComputedStyle(document.body).backgroundColor;
+                        const rgb = bg.match(/\\d+/g);
+                        if (rgb && rgb.length >= 3) {
+                            r = parseInt(rgb[0]);
+                            g = parseInt(rgb[1]);
+                            b = parseInt(rgb[2]);
+                        }
+                    } catch(e) {}
 
-                if (window.BlobPDF && typeof BlobPDF.postMessage === 'function') {
+                    // 2. Add a new page (maybe smaller or same size)
+                    // If we want a "smaller" page, we could specify dimensions, 
+                    // but keeping it consistent is usually safer for printers.
+                    this.addPage();
+                    
+                    const pageWidth = this.internal.pageSize.getWidth();
+                    const pageHeight = this.internal.pageSize.getHeight();
+                    
+                    // 3. Fill background
+                    this.setFillColor(r, g, b);
+                    this.rect(0, 0, pageWidth, pageHeight, 'F');
+                    
+                    // 4. Add title
+                    this.setTextColor(255, 255, 255); // White text for dark backgrounds
+                    if (r > 200 && g > 200 && b > 200) this.setTextColor(0, 0, 0); // Black if light
+                    
+                    this.setFontSize(14);
+                    this.text("Captured Image", pageWidth/2, 20, { align: 'center' });
+                    
+                    // 5. Add image (smaller size as requested: 80% width)
+                    const imgWidth = pageWidth * 0.8;
+                    const imgHeight = (imgWidth * 0.75); // Assume 4:3
+                    const x = (pageWidth - imgWidth) / 2;
+                    const y = 30;
+                    
+                    this.addImage(rawBase64, 'JPEG', x, y, imgWidth, imgHeight);
+                    log("Image added to PDF with background match");
+                }
+              } catch (e) {
+                log("Error refining PDF: " + e.message);
+              }
+
+              try {
+                var dataUri = this.output('datauristring');
+                var base64 = String(dataUri).split(',')[1];
+                if (window.BlobPDF) {
                   BlobPDF.postMessage(base64);
                 } else if (typeof proto.__originalSave === 'function') {
-                  // Fallback for normal browsers
                   proto.__originalSave.call(this, fileName || 'document.pdf');
                 }
               } catch (err) {
-                // If anything fails, fall back to original behavior
+                log("Error generating PDF blob: " + err.message);
                 if (typeof proto.__originalSave === 'function') {
                   proto.__originalSave.call(this, fileName || 'document.pdf');
                 }
               }
             };
-
             JsPDFCtor.__ultraPatched = true;
           } catch (e) {
-            // Silent fail – do not break page
+            log("Patch failed: " + e.message);
           }
         }
 
@@ -601,6 +665,52 @@ class _WebResultViewState extends State<WebResultView> {
             clearInterval(interval);
           }
         }, 500);
+
+        // Also poll a few times in case jsPDF loads late
+        var tries = 0;
+        var interval = setInterval(function () {
+          tries++;
+          if (window.jspdf || window.jsPDF) {
+            patchJsPDF();
+            clearInterval(interval);
+          } else if (tries > 20) {
+            clearInterval(interval);
+            log("Giving up on jsPDF patch");
+          }
+        }, 1000);
+
+        function injectImageToDOM() {
+            try {
+                const imageBase64 = "${widget.annotatedImage}";
+                if (!imageBase64 || imageBase64 === "null" || imageBase64 === "undefined") return;
+                
+                let container = document.body;
+                if (!document.getElementById('ultraInjectedImage')) {
+                    const div = document.createElement('div');
+                    div.id = 'ultraInjectedImage';
+                    div.style.position = 'absolute';
+                    div.style.left = '0';
+                    div.style.top = '0';
+                    div.style.zIndex = '-1';
+                    div.style.opacity = '0.01'; // Very faint but technically visible
+                    div.style.pointerEvents = 'none';
+                    
+                    const img = document.createElement('img');
+                    img.src = imageBase64.startsWith('data:') ? imageBase64 : 'data:image/jpeg;base64,' + imageBase64;
+                    img.style.width = '300px'; 
+                    div.appendChild(img);
+                    
+                    container.appendChild(div);
+                    log("Image injected to DOM for capture");
+                }
+            } catch (e) {
+                log("DOM Injection error: " + e.message);
+            }
+        }
+
+        // Inject to DOM every 2 seconds to ensure it stays there if page re-renders
+        setInterval(injectImageToDOM, 2000);
+        injectImageToDOM();
       })();
     ''');
   }

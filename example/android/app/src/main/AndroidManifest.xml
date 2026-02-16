@@ -47,19 +47,24 @@
         <!-- USB Camera MainActivity from AndroidUSBCamera2025 -->
         <activity
             android:name="com.jiangdg.demo.MainActivity"
-            android:exported="false"
+            android:exported="true"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize"
             android:hardwareAccelerated="true"
-            android:theme="@style/Theme.AppCompat.Light.NoActionBar">
-            <!-- Removed to prevent automatic open when USB is connected -->
-            <!-- 
+            android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
+
+        <!-- Silent activity to handle USB permission persistence -->
+        <activity
+            android:name="com.jiangdg.demo.UsbPermissionActivity"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:exported="true">
             <intent-filter>
-                <action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED"/>
+                <action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" />
             </intent-filter>
-            -->
             <meta-data
                 android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED"
-                android:resource="@xml/default_device_filter"/>
+                android:resource="@xml/default_device_filter" />
         </activity>
         <!-- FileProvider for sharing/opening PDFs generated in Flutter -->
         <provider

@@ -98,6 +98,7 @@ class RenderManager(
 
     init {
         this.mCameraRender = CameraRender(context)
+        this.mCameraRender?.setCameraSize(surfaceWidth, surfaceHeight)
         this.mScreenRender = ScreenRender(context)
         this.mCaptureRender = CaptureRender(context)
         Logger.i(TAG, "create RenderManager, Open ES version is ${Utils.getGLESVersion(context)}")
@@ -131,6 +132,7 @@ class RenderManager(
                     mWidth = first as Int
                     mHeight = second as Int
                     mCameraRender?.setSize(mWidth, mHeight)
+                    mCameraRender?.setCameraSize(surfaceWidth, surfaceHeight)
                     mScreenRender?.setSize(mWidth, mHeight)
                     mCaptureRender?.setSize(mWidth, mHeight)
                     mCameraSurfaceTexture?.setDefaultBufferSize(mWidth, mHeight)

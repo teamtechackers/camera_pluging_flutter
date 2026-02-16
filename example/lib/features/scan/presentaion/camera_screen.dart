@@ -160,6 +160,7 @@ class _CameraScreenState extends State<CameraScreen> {
         child: Stack(
           fit: StackFit.expand,
           children: [
+            /// CAMERA PREVIEW
             if (_isCameraInitialized)
               FittedBox(
                 fit: BoxFit.cover,
@@ -168,12 +169,17 @@ class _CameraScreenState extends State<CameraScreen> {
             else
               const Center(child: CircularProgressIndicator()),
 
-            Padding(
-              padding: EdgeInsets.all(30.r),
-              child: Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(15.r),
-                  border: Border.all(color: Colors.white.withOpacity(0.5), width: 2),
+            /// ⭐ SCAN OVERLAY (FIXED — ALWAYS VISIBLE)
+            IgnorePointer(
+              child: Positioned.fill(
+                child: Padding(
+                  padding: EdgeInsets.all(30.r),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16.r),
+                      border: Border.all(color: Colors.white.withOpacity(0.6), width: 2),
+                    ),
+                  ),
                 ),
               ),
             ),

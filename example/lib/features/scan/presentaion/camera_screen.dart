@@ -51,6 +51,7 @@ class _CameraScreenState extends State<CameraScreen> {
 
     try {
       await _controller!.initialize();
+      await _controller!.setZoomLevel(1.1);
       setState(() {
         _isCameraInitialized = true;
       });

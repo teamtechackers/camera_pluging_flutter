@@ -82,7 +82,7 @@ class _CameraScreenState extends State<CameraScreen> {
       final Directory tempDir = await getTemporaryDirectory();
       final String targetPath = "${tempDir.path}/compressed_${DateTime.now().millisecondsSinceEpoch}.jpg";
 
-      final File squareFile = await cropToOverlaySquare(originalFile);
+      final File squareFile = await cropToOverlaySquareCorrect(originalFile);
 
       final XFile? compressedImage = await FlutterImageCompress.compressAndGetFile(squareFile.absolute.path, targetPath, quality: 50);
 
@@ -106,35 +106,42 @@ class _CameraScreenState extends State<CameraScreen> {
     }
   }
 
-  Future<File> cropToOverlaySquare(File file) async {
+  Future<File> cropToOverlaySquareCorrect(File file) async {
     final bytes = await file.readAsBytes();
     final img.Image? original = img.decodeImage(bytes);
     if (original == null) return file;
 
-    // FULL image size
     final int imgWidth = original.width;
     final int imgHeight = original.height;
 
-    // OVERLAY parameters (tumhare UI ke)
-    final double overlayPadding = 30; // 30.r padding
-    final double overlaySize = 300 - 2 * overlayPadding; // square box inside container
+    // UI container size
+    final double containerSize = 300; // Container width & height
+    final double overlayPadding = 30.r; // Padding from container
+    final double overlaySize = containerSize - 2 * overlayPadding; // inner square
 
-    // PREVIEW container size
-    final double previewWidth = 300; // Container width
-    final double previewHeight = 300; // Container height
+    // Camera preview size
+    final double previewWidth = _controller!.value.previewSize!.width;
+    final double previewHeight = _controller!.value.previewSize!.height;
 
-    // Scale overlay to original image size
-    int cropX = ((overlayPadding / previewWidth) * imgWidth).round();
-    int cropY = ((overlayPadding / previewHeight) * imgHeight).round();
-    int cropSize = ((overlaySize / previewWidth) * imgWidth).round(); // assuming square
+    // Fit scaling (FittedBox fit: BoxFit.cover)
+    final double scaleX = imgWidth / previewHeight; // note: rotated
+    final double scaleY = imgHeight / previewWidth;
 
-    // Safety check
-    if (cropX + cropSize > imgWidth) cropSize = imgWidth - cropX;
-    if (cropY + cropSize > imgHeight) cropSize = imgHeight - cropY;
+    int cropX = (overlayPadding * scaleX).round();
+    int cropY = (overlayPadding * scaleY).round();
+    int cropSizeX = (overlaySize * scaleX).round();
+    int cropSizeY = (overlaySize * scaleY).round();
+
+    // Use min to keep square crop
+    int cropSize = cropSizeX < cropSizeY ? cropSizeX : cropSizeY;
+
+    // Safety
+    if (cropX + cropSize > imgWidth) cropX = imgWidth - cropSize;
+    if (cropY + cropSize > imgHeight) cropY = imgHeight - cropSize;
 
     final img.Image cropped = img.copyCrop(original, cropX, cropY, cropSize, cropSize);
 
-    final croppedFile = File("${file.path}_square_overlay.jpg");
+    final croppedFile = File("${file.path}_overlay_correct.jpg");
     await croppedFile.writeAsBytes(img.encodeJpg(cropped, quality: 90));
 
     return croppedFile;

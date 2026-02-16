@@ -11,8 +11,10 @@ import androidx.appcompat.app.AppCompatActivity
 class UsbPermissionActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // Finish immediately so the user sees nothing.
-        // The permission association is still registered by the system.
-        finish()
+        // 🚀 CRITICAL FIX: Adding a slight delay before finishing.
+        // If the activity finishes too fast, the system might not persist the "Always use" choice.
+        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+            finish()
+        }, 500)
     }
 }

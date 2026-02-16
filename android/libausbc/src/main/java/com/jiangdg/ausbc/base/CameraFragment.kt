@@ -82,6 +82,22 @@ abstract class CameraFragment : BaseFragment(), ICameraStateCallBack {
         unRegisterMultiCamera()
     }
 
+    override fun onResume() {
+        super.onResume()
+        // 🚀 CRITICAL FIX: If camera is permitted but not opened, try to trigger it.
+        // This handles the "first-time grant" where the dialog dismissal disrupts the flow.
+        if (!isCameraOpened()) {
+            mCameraClient?.getDeviceList()?.firstOrNull()?.let { device ->
+                if (mCameraClient?.hasPermission(device) == true) {
+                    Logger.i(TAG, "onResume: Camera permitted but NOT opened. Retrying connection...")
+                    // Triggering requestPermission when already permitted 
+                    // will cause USBMonitor to immediately call onConnect callback.
+                    requestPermission(device)
+                }
+            }
+        }
+    }
+
     protected fun registerMultiCamera() {
         mCameraClient = MultiCameraClient(requireContext(), object : IDeviceConnectCallBack {
             override fun onAttachDev(device: UsbDevice?) {
@@ -137,7 +153,20 @@ abstract class CameraFragment : BaseFragment(), ICameraStateCallBack {
                     }
                     mCurrentCamera = SettableFuture()
                     mCurrentCamera?.set(camera)
-                    openCamera(mCameraView)
+                    // Add 1000ms delay to ensure UI/Surface is fully ready
+                    // especially after fresh install / permission dialog dismissal
+                    mCameraView?.let { view ->
+                        if (view is View) {
+                            (view as View).postDelayed({
+                                if (!isCameraOpened()) {
+                                    Logger.i(TAG, "onConnectDev: Triggering openCamera after delay")
+                                    openCamera(mCameraView)
+                                }
+                            }, 1000)
+                        } else {
+                            openCamera(mCameraView)
+                        }
+                    } ?: openCamera(mCameraView)
                     Logger.i(TAG, "camera connection. pid: ${device.productId}, vid: ${device.vendorId}")
                 }
             }

@@ -157,12 +157,28 @@ class _CameraScreenState extends State<CameraScreen> {
       decoration: BoxDecoration(borderRadius: BorderRadius.circular(24.r), color: Colors.black),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(24.r),
-        child: _isCameraInitialized
-            ? FittedBox(
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            if (_isCameraInitialized)
+              FittedBox(
                 fit: BoxFit.cover,
                 child: SizedBox(width: _controller!.value.previewSize!.height, height: _controller!.value.previewSize!.width, child: CameraPreview(_controller!)),
               )
-            : const Center(child: CircularProgressIndicator()),
+            else
+              const Center(child: CircularProgressIndicator()),
+
+            Padding(
+              padding: EdgeInsets.all(30.r),
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(15.r),
+                  border: Border.all(color: Colors.white.withOpacity(0.5), width: 2),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

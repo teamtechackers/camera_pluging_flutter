@@ -97,17 +97,21 @@ class PdfService {
 
             // Annotated Image Component
             if (profileImage != null)
-              pw.Container(
-                width: double.infinity,
-                margin: const pw.EdgeInsets.symmetric(horizontal: 10),
-                decoration: pw.BoxDecoration(
-                  borderRadius: const pw.BorderRadius.all(pw.Radius.circular(15)),
-                  border: pw.Border.all(color: PdfColor.fromInt(0xffE7CC8D), width: 1.5),
-                ),
-                child: pw.ClipRRect(
-                  horizontalRadius: 15,
-                  verticalRadius: 15,
-                  child: pw.Image(profileImage, fit: pw.BoxFit.cover),
+              pw.Padding(
+                padding: const pw.EdgeInsets.symmetric(horizontal: 10),
+                child: pw.AspectRatio(
+                  aspectRatio: 4 / 3,
+                  child: pw.Container(
+                    decoration: pw.BoxDecoration(
+                      borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
+                      border: pw.Border.all(color: PdfColor.fromInt(0xffE7CC8D), width: 1.5),
+                    ),
+                    child: pw.ClipRRect(
+                      horizontalRadius: 8,
+                      verticalRadius: 8,
+                      child: pw.Image(profileImage, fit: pw.BoxFit.cover),
+                    ),
+                  ),
                 ),
               ),
 

@@ -101,15 +101,18 @@ class PdfService {
                 padding: const pw.EdgeInsets.symmetric(horizontal: 10),
                 child: pw.AspectRatio(
                   aspectRatio: 4 / 3,
-                  child: pw.Container(
-                    decoration: pw.BoxDecoration(
-                      borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
-                      border: pw.Border.all(color: PdfColor.fromInt(0xffE7CC8D), width: 1.5),
-                    ),
-                    child: pw.ClipRRect(
-                      horizontalRadius: 8,
-                      verticalRadius: 8,
-                      child: pw.Image(profileImage, fit: pw.BoxFit.cover),
+                  child: pw.ClipRRect(
+                    horizontalRadius: 8,
+                    verticalRadius: 8,
+                    child: pw.Container(
+                      decoration: pw.BoxDecoration(
+                        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
+                        border: pw.Border.all(color: PdfColor.fromInt(0xffE7CC8D), width: 1.5),
+                      ),
+                      child: pw.Image(
+                        profileImage,
+                        fit: pw.BoxFit.cover,
+                      ),
                     ),
                   ),
                 ),

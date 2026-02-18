@@ -178,15 +178,15 @@ void _showAdvancedBottomSheet(BuildContext context) {
                       Get.toNamed(AppPages.cameraScreen);
                     },
                   ),
-                  BottomSheetCircular(
+                   BottomSheetCircular(
                     height: size.width * 0.27,
                     width: size.width * 0.27,
                     iconSize: 30,
                     icon: AppAssets.gallery,
                     title: 'galery'.tr,
                     onTap: () async {
+                      Get.back(); // Close bottom sheet FIRST
                       await controller.pickImageFromGallery();
-                      Get.back();
                     },
                   ),
                 ],

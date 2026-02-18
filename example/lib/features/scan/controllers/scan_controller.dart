@@ -133,21 +133,29 @@ class ScanController extends GetxController with WidgetsBindingObserver {
   Future<void> pickImageFromGallery() async {
     try {
       isLoading.value = true;
+      log('Starting gallery image selection...');
       await Future.delayed(const Duration(milliseconds: 50));
 
-      final hasPermission = await requestGalleryPermission();
-      if (!hasPermission) {
-        showCustomSnackbar(
-          title: '',
-          message: 'grant_photo_permission',
-          type: SnackbarType.warning,
-        );
-        return;
+      final androidInfo = await DeviceInfoPlugin().androidInfo;
+      final sdkInt = androidInfo.version.sdkInt;
+      log('Android SDK Version: $sdkInt');
+
+      // For Android 13+, image_picker usually handles things without manual photos permission 
+      // if using modern system picker. We'll still check but let it proceed if it fails.
+      if (Platform.isAndroid && sdkInt < 33) {
+        final status = await Permission.storage.status;
+        if (status.isDenied) {
+          log('Storage permission denied, requesting...');
+          final result = await Permission.storage.request();
+          if (result.isPermanentlyDenied) {
+            log('Storage permission permanently denied');
+            openAppSettings();
+            return;
+          }
+        }
       }
 
-      // Add delay after permission is granted
-      await Future.delayed(const Duration(milliseconds: 100));
-
+      log('Launching ImagePicker...');
       final image = await _picker.pickImage(
         source: ImageSource.gallery,
         maxWidth: 1920,
@@ -156,11 +164,14 @@ class ScanController extends GetxController with WidgetsBindingObserver {
       );
 
       if (image != null) {
+        log('Image selected: ${image.path}');
         selectedImage.value = File(image.path);
         isFromUsb.value = false;
+      } else {
+        log('No image selected (user cancelled)');
       }
     } catch (e) {
-      log('Failed to select image: $e');
+      log('Failed to select image from gallery: $e');
       showCustomSnackbar(
         title: '',
         message: 'failed_select_image',

@@ -29,6 +29,10 @@ class ApiEndpoints {
   static String ultraScanApi({required String macAddress}) =>
       '/UltraScan.php?API=$macAddress';
 
+  // Image Upload endpoint
+  static String uploadImage({required String macAddress}) =>
+      '/upload.php?MAC_Address=$macAddress';
+
   // Add more endpoints as needed for your features
   // static const String bookings = '/bookings';
   // static const String drivers = '/drivers';

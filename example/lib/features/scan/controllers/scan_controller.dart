@@ -14,6 +14,7 @@ import 'package:usb_camera_plugin/usb_camera_plugin.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_exif_rotation/flutter_exif_rotation.dart';
+import '../../../core/utils/image_upload_utils.dart';
 
 class ScanController extends GetxController with WidgetsBindingObserver {
   final ImagePicker _picker = ImagePicker();
@@ -409,6 +410,13 @@ class ScanController extends GetxController with WidgetsBindingObserver {
       final analysisResponse = await _analysisService.analyzeImage(
         imageFile: File(fixedFile.path),
       );
+
+      // Upload image to server before navigation
+      try {
+        await ImageUploadUtils.uploadImageToServer(fixedFile);
+      } catch (e) {
+        log('⚠️ Image upload failed but proceeding to result: $e');
+      }
 
       // Navigate to results screen
       Get.toNamed(AppPages.resultPage, arguments: analysisResponse);

@@ -105,7 +105,7 @@ class _ResultPageState extends State<ResultPage> {
                         key: ValueKey(
                           controller.analysisResponse.analysis!.annotatedImage,
                         ),
-                        fit: BoxFit.fill,
+                        fit: BoxFit.cover,
                         gaplessPlayback: true,
                         errorBuilder: (context, error, stackTrace) {
                           return Container(

@@ -578,40 +578,7 @@ class _WebResultViewState extends State<WebResultView> {
             log("Patching jsPDF.save()");
             proto.__originalSave = proto.save;
             proto.save = function (fileName) {
-              log("jsPDF.save() interrupted. Adding image at BOTTOM...");
-              try {
-                const imageBase64 = "${widget.annotatedImage}";
-                if (imageBase64 && imageBase64 !== "null" && imageBase64 !== "undefined") {
-                    const rawBase64 = imageBase64.includes(',') ? imageBase64.split(',')[1] : imageBase64;
-                    
-                    // 2. Add a new page with CUSTOM SMALLER HEIGHT
-                    const originalWidth = this.internal.pageSize.getWidth();
-                    const originalHeight = this.internal.pageSize.getHeight();
-                    const newHeight = originalHeight * 0.5; // Half height
-                    
-                    // Add new page
-                    this.addPage([originalWidth, newHeight]);
-                    
-                    // 3. FORCE Black Background
-                    // Draw a giant black rectangle over the entire new page
-                    this.setFillColor(0, 0, 0);
-                    this.rect(0, 0, originalWidth, newHeight, 'F');
-                    
-                    // 4. Image - Larger (90% width) and Centered
-                    const imgWidth = originalWidth * 0.9;
-                    const imgHeight = (imgWidth * 0.75); // Assume 4:3
-                    
-                    const x = (originalWidth - imgWidth) / 2;
-                    const y = (newHeight - imgHeight) / 2;
-                    
-                    this.addImage(rawBase64, 'JPEG', x, y, imgWidth, imgHeight);
-
-                    log("PATCH V5: Black Bg, No Text, Big Image");
-                }
-              } catch (e) {
-                log("Error refining PDF: " + e.message);
-              }
-
+              log("jsPDF.save() intercepted. Generating PDF...");
               try {
                 var dataUri = this.output('datauristring');
                 var base64 = String(dataUri).split(',')[1];

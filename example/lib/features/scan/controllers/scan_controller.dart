@@ -411,9 +411,12 @@ class ScanController extends GetxController with WidgetsBindingObserver {
         imageFile: File(fixedFile.path),
       );
 
-      // Upload image to server before navigation
+      // Upload annotated image to server before navigation
       try {
-        await ImageUploadUtils.uploadImageToServer(fixedFile);
+        if (analysisResponse.analysis?.annotatedImage != null) {
+          await ImageUploadUtils.uploadAnnotatedImageToServer(
+              analysisResponse.analysis!.annotatedImage!);
+        }
       } catch (e) {
         log('⚠️ Image upload failed but proceeding to result: $e');
       }

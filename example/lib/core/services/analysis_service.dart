@@ -402,10 +402,11 @@ class AnalysisService {
         }
       }
 
-      // Encode to PNG
-      final Uint8List outputImageBytes = cv.imencode(".png", annotatedImage).$2;
+      // Encode to JPEG to reduce payload size and avoid 413 errors
+      // Using default JPEG quality (95) which already provides massive size reduction over PNG
+      final Uint8List outputImageBytes = cv.imencode(".jpg", annotatedImage).$2;
       final String base64Image = base64Encode(outputImageBytes);
-      final String annotatedImageStr = "data:image/png;base64,$base64Image";
+      final String annotatedImageStr = "data:image/jpeg;base64,$base64Image";
 
       // Clean up resources
       originalImage.dispose();

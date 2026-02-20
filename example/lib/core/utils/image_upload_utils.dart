@@ -10,10 +10,13 @@ class ImageUploadUtils {
   static const String _macAddressKey = 'saved_mac_address';
   static final Dio _dio = Dio();
 
-  static Future<void> uploadImageToServer(File imageFile) async {
+  /// Uploads a base64 data URL string to the server.
+  /// The upload is associated with the saved MAC address.
+  static Future<void> uploadAnnotatedImageToServer(String dataUrl) async {
     try {
       log('📤 Starting image upload process...');
 
+      // 1. Retrieve saved MAC address
       final prefs = await SharedPreferences.getInstance();
       final macAddress = prefs.getString(_macAddressKey) ?? '';
 
@@ -22,10 +25,7 @@ class ImageUploadUtils {
         return;
       }
 
-      final bytes = await imageFile.readAsBytes();
-      final String base64Image = base64Encode(bytes);
-      final String dataUrl = 'data:image/jpeg;base64,$base64Image';
-
+      // 2. Prepare payload
       final Map<String, dynamic> body = {
         'imagen_base64': dataUrl,
       };

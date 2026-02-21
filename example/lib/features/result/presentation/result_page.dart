@@ -201,30 +201,7 @@ class _ResultPageState extends State<ResultPage> {
                   ],
                 ),
               ),
-              const SizedBox(height: 12),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 30),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Obx(
-                        () => CustomTextButton(
-                          text: controller.isDownloadingPdf.value
-                              ? 'processing_pdf'.tr
-                              : 'download_pdf'.tr,
-                          onTap: controller.isDownloadingPdf.value
-                              ? () {} // Disable or ignore while processing
-                              : () {
-                                  _webResultKey.currentState?.triggerDownload();
-                                },
-                          paddingHorizontal: 40,
-                          paddingVertical: 11,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+
               const SizedBox(height: 50),
             ],
           ),

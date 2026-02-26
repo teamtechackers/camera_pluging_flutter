@@ -1,22 +1,26 @@
 import 'dart:convert';
 import 'dart:developer';
 import 'dart:io';
-import 'package:get/get.dart';
+
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:get/get.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:open_file/open_file.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../controller/result_controller.dart';
-import '../../../core/widgets/ultrascan4d.dart';
-import '../../body_area/widget/text_button.dart';
-import '../../../core/constants/ui/app_colors.dart';
-import 'package:webview_flutter/webview_flutter.dart';
-import '../../../core/api/models/analysis_response.dart';
-import '../../../core/constants/ui/app_text_styles.dart';
-import '../../../core/widgets/background_container.dart';
 import 'package:usb_camera_plugin_example/core/constants/app/app_assets.dart';
 import 'package:usb_camera_plugin_example/core/widgets/inputs/send_text_field.dart';
 import 'package:usb_camera_plugin_example/features/body_area/controllers/bottom_sheet_controller.dart';
-import 'package:path_provider/path_provider.dart';
+import 'package:webview_flutter/webview_flutter.dart';
+
+import '../../../core/api/models/analysis_response.dart';
+import '../../../core/constants/ui/app_colors.dart';
+import '../../../core/constants/ui/app_text_styles.dart';
+import '../../../core/widgets/background_container.dart';
+import '../../../core/widgets/ultrascan4d.dart';
+import '../../body_area/widget/text_button.dart';
+import '../controller/result_controller.dart';
 
 class ResultPage extends StatefulWidget {
   const ResultPage({required this.analysisResponse, super.key});
@@ -33,19 +37,14 @@ class _ResultPageState extends State<ResultPage> {
   @override
   void initState() {
     super.initState();
-    // Initialize controller only once when the widget is first created
-    // Delete existing controller if it exists to ensure fresh data
     if (Get.isRegistered<ResultController>()) {
       Get.delete<ResultController>();
     }
-    controller = Get.put(
-      ResultController(analysisResponse: widget.analysisResponse),
-    );
+    controller = Get.put(ResultController(analysisResponse: widget.analysisResponse));
   }
 
   @override
   void dispose() {
-    // Clean up controller when widget is disposed
     if (Get.isRegistered<ResultController>()) {
       Get.delete<ResultController>();
     }
@@ -56,182 +55,192 @@ class _ResultPageState extends State<ResultPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: BackgroundContainer(
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
-              const SizedBox(height: 50),
+        child: Column(
+          children: [
+            const SizedBox(height: 30),
 
-              // const Align(
-              //   alignment: Alignment.topRight,
-              //   child: Padding(
-              //     padding: EdgeInsets.only(right: 18),
-              //     child: SettingIconWidget(),
-              //   ),
-              // ),
-              Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text('protocol'.tr, style: AppTextStyles.heading4),
-                  Transform.translate(
-                    offset: const Offset(0, -8),
-                    child: Text(
-                      'and_result'.tr,
-                      style: AppTextStyles.heading3.copyWith(
-                        color: AppColors.yellowColor,
-                      ),
-                    ),
-                  ),
-                  const Ultrascan4d(),
-                ],
-              ),
+            /// HEADER
+            Column(
+              children: [
+                Text('protocol'.tr, style: AppTextStyles.heading5),
+                Transform.translate(
+                  offset: const Offset(0, -8),
+                  child: Text('and_result'.tr, style: AppTextStyles.heading4.copyWith(color: AppColors.yellowColor)),
+                ),
+                const Ultrascan4d(),
+              ],
+            ),
 
-              // Display Annotated Image with error handling
-              if (controller.analysisResponse.analysis?.annotatedImage != null)
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 10,
-                  ),
-                  child: AspectRatio(
-                    aspectRatio: 4 / 3,
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Image.memory(
-                        base64Decode(
-                          controller.analysisResponse.analysis!.annotatedImage!
-                              .split(',')
-                              .last,
-                        ),
-                        key: ValueKey(
-                          controller.analysisResponse.analysis!.annotatedImage,
-                        ),
-                        fit: BoxFit.cover,
-                        gaplessPlayback: true,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
-                            color: Colors.grey[300],
-                            child: const Center(
-                              child: Text(
-                                "Failed to load image",
-                                style: TextStyle(color: Colors.red),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ),
-                )
-              else
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Container(
-                    height: 200,
-                    color: Colors.grey[300],
-                    child: const Center(
-                      child: Text("No detection image available"),
-                    ),
+            /// IMAGE
+            if (controller.analysisResponse.analysis?.annotatedImage != null)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                child: AspectRatio(
+                  aspectRatio: 4 / 3,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.memory(base64Decode(controller.analysisResponse.analysis!.annotatedImage!.split(',').last), fit: BoxFit.cover),
                   ),
                 ),
-              // Text('analysis_summary'.tr, style: AppTextStyles.heading4),
+              ),
 
-              // Obx(
-              //   () => Padding(
-              //     padding: const EdgeInsets.all(20),
-              //     child: Text(
-              //       controller.resultLink.value,
-              //       style: AppTextStyles.body2,
-              //     ),
-              //   ),
-              // ),
-              if (controller.analysisResponse.analysis != null) ...[
-                const SizedBox(height: 16),
-                Padding(
+            /// WEBVIEW AREA (THIS IS THE KEY FIX)
+            if (controller.analysisResponse.analysis != null)
+              Expanded(
+                child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Align(
-                        alignment: Alignment.center,
-                        child: Text(
-                          'analysis_summary'.tr,
-                          style: AppTextStyles.heading4.copyWith(
-                            color: AppColors.whiteColor,
-                            fontSize: 22,
-                          ),
+                      Text('analysis_summary'.tr, style: AppTextStyles.heading4.copyWith(color: AppColors.whiteColor, fontSize: 22)),
+
+                      /// THIS Expanded is CRITICAL
+                      Expanded(
+                        child: Obx(
+                          () => controller.resultUrl.value.isEmpty
+                              ? const Center(child: CircularProgressIndicator())
+                              : WebResultView(
+                                  key: _webResultKey,
+                                  url: controller.resultUrl.value,
+                                  annotatedImage: controller.analysisResponse.analysis?.annotatedImage,
+                                  onDownloadStarted: () => controller.isDownloadingPdf.value = true,
+                                  onDownloadFinished: () => controller.isDownloadingPdf.value = false,
+                                ),
                         ),
-                      ),
-                      const SizedBox(height: 16),
-                      Obx(
-                        () => controller.resultUrl.value.isEmpty
-                            ? const Center(child: CircularProgressIndicator())
-                            : WebResultView(
-                                key: _webResultKey,
-                                url: controller.resultUrl.value,
-                                annotatedImage: controller.analysisResponse.analysis?.annotatedImage,
-                                onDownloadStarted: () {
-                                  controller.isDownloadingPdf.value = true;
-                                },
-                                onDownloadFinished: () {
-                                  controller.isDownloadingPdf.value = false;
-                                },
-                              ),
                       ),
                     ],
                   ),
                 ),
-              ],
-              const SizedBox(height: 20),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 30),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: CustomTextButton(
-                        text: 'ask_a_question'.tr,
-                        onTap: () {
-                          // controller.analysisResponse.analysis = null;
-                          _showAdvancedBottomSheet(context);
-                          // Get.back();
-                        },
-                        paddingHorizontal: 40,
-                        paddingVertical: 11,
-                      ),
-                    ),
-                  ],
-                ),
               ),
 
-              const SizedBox(height: 50),
-            ],
-          ),
+            /// FIXED BUTTON
+            Padding(
+              padding: const EdgeInsets.fromLTRB(30, 10, 30, 30),
+              child: CustomTextButton(text: 'ask_a_question'.tr, onTap: () => _showAdvancedBottomSheet(context), paddingHorizontal: 40, paddingVertical: 11),
+            ),
+          ],
         ),
       ),
+
+      // body:
+      //  BackgroundContainer(
+      //   child: Column(
+      //     children: [
+      //       const SizedBox(height: 50),
+      //       Column(
+      //         mainAxisSize: MainAxisSize.min,
+      //         children: [
+      //           Text('protocol'.tr, style: AppTextStyles.heading4),
+      //           Transform.translate(
+      //             offset: const Offset(0, -8),
+      //             child: Text('and_result'.tr, style: AppTextStyles.heading3.copyWith(color: AppColors.yellowColor)),
+      //           ),
+      //           const Ultrascan4d(),
+      //         ],
+      //       ),
+      //       if (controller.analysisResponse.analysis?.annotatedImage != null)
+      //         Padding(
+      //           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      //           child: AspectRatio(
+      //             aspectRatio: 4 / 3,
+      //             child: ClipRRect(
+      //               borderRadius: BorderRadius.circular(8),
+      //               child: Image.memory(
+      //                 base64Decode(controller.analysisResponse.analysis!.annotatedImage!.split(',').last),
+      //                 key: ValueKey(controller.analysisResponse.analysis!.annotatedImage),
+      //                 fit: BoxFit.cover,
+      //                 gaplessPlayback: true,
+      //                 errorBuilder: (context, error, stackTrace) {
+      //                   return Container(
+      //                     color: Colors.grey[300],
+      //                     child: const Center(
+      //                       child: Text("Failed to load image", style: TextStyle(color: Colors.red)),
+      //                     ),
+      //                   );
+      //                 },
+      //               ),
+      //             ),
+      //           ),
+      //         )
+      //       else
+      //         Padding(
+      //           padding: const EdgeInsets.all(16.0),
+      //           child: Container(
+      //             height: 200,
+      //             color: Colors.grey[300],
+      //             child: const Center(child: Text("No detection image available")),
+      //           ),
+      //         ),
+      //       if (controller.analysisResponse.analysis != null) ...[
+      //         const SizedBox(height: 16),
+      //         Padding(
+      //           padding: const EdgeInsets.symmetric(horizontal: 20),
+      //           child: Column(
+      //             crossAxisAlignment: CrossAxisAlignment.start,
+      //             children: [
+      //               Align(
+      //                 alignment: Alignment.center,
+      //                 child: Text('analysis_summary'.tr, style: AppTextStyles.heading4.copyWith(color: AppColors.whiteColor, fontSize: 22)),
+      //               ),
+      //               const SizedBox(height: 16),
+      //               Obx(
+      //                 () => controller.resultUrl.value.isEmpty
+      //                     ? const Center(child: CircularProgressIndicator())
+      //                     : WebResultView(
+      //                         key: _webResultKey,
+      //                         url: controller.resultUrl.value,
+      //                         annotatedImage: controller.analysisResponse.analysis?.annotatedImage,
+      //                         onDownloadStarted: () {
+      //                           controller.isDownloadingPdf.value = true;
+      //                         },
+      //                         onDownloadFinished: () {
+      //                           controller.isDownloadingPdf.value = false;
+      //                         },
+      //                       ),
+      //               ),
+      //             ],
+      //           ),
+      //         ),
+      //       ],
+      //       const SizedBox(height: 20),
+      //       Padding(
+      //         padding: const EdgeInsets.symmetric(horizontal: 30),
+      //         child: Row(
+      //           children: [
+      //             Expanded(
+      //               child: CustomTextButton(
+      //                 text: 'ask_a_question'.tr,
+      //                 onTap: () {
+      //                   _showAdvancedBottomSheet(context);
+      //                 },
+      //                 paddingHorizontal: 40,
+      //                 paddingVertical: 11,
+      //               ),
+      //             ),
+      //           ],
+      //         ),
+      //       ),
+      //       const SizedBox(height: 50),
+      //     ],
+      //   ),
+      // ),
     );
   }
 }
 
 void _showAdvancedBottomSheet(BuildContext context) {
   final size = MediaQuery.of(context).size;
-
-  // Initialize controller for this bottom sheet instance
-  // Using a unique tag to avoid conflicts
   final tag = 'bottom_sheet_${DateTime.now().millisecondsSinceEpoch}';
   final controller = Get.put(BottomSheetController(), tag: tag);
 
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-    ),
+    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
     backgroundColor: Colors.transparent,
     builder: (BuildContext context) {
       return _BottomSheetContent(size: size, controller: controller);
     },
   ).then((_) {
-    // Delay disposal to ensure any navigation completes first
-    // This prevents the TextEditingController from being disposed while still in use
     Future.delayed(const Duration(milliseconds: 500), () {
       if (Get.isRegistered<BottomSheetController>(tag: tag)) {
         Get.delete<BottomSheetController>(tag: tag);
@@ -256,10 +265,7 @@ class _BottomSheetContent extends StatelessWidget {
       child: Container(
         constraints: BoxConstraints(maxHeight: size.height * 0.53),
         decoration: BoxDecoration(
-          image: DecorationImage(
-            image: AssetImage(AppAssets.bottomsheetBg),
-            fit: BoxFit.cover,
-          ),
+          image: DecorationImage(image: AssetImage(AppAssets.bottomsheetBg), fit: BoxFit.cover),
           borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
         child: Column(
@@ -272,25 +278,19 @@ class _BottomSheetContent extends StatelessWidget {
                 children: [
                   Text(
                     'how_can_i_help_scan'.tr,
-                    style: AppTextStyles.body2.copyWith(
-                      color: AppColors.whiteColor,
-                    ),
+                    style: AppTextStyles.body2.copyWith(color: AppColors.whiteColor),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 8),
                   Text(
                     'choose_question_or_formulate'.tr,
-                    style: AppTextStyles.title1.copyWith(
-                      color: AppColors.goldColor,
-                      fontSize: 12,
-                    ),
+                    style: AppTextStyles.title1.copyWith(color: AppColors.goldColor, fontSize: 12),
                     textAlign: TextAlign.center,
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 24),
-            // FAQ Section
             Flexible(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -298,62 +298,21 @@ class _BottomSheetContent extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      'frequently_asked_questions'.tr,
-                      style: AppTextStyles.body2.copyWith(
-                        color: AppColors.whiteColor,
-                      ),
-                    ),
+                    Text('frequently_asked_questions'.tr, style: AppTextStyles.body2.copyWith(color: AppColors.whiteColor)),
                     const SizedBox(height: 16),
-                    Obx(
-                      () => _buildFAQButton(
-                        context,
-                        'faq_question_1'.tr,
-                        () => controller.selectQuestion('faq_question_1'.tr),
-                        isLoading: controller.isLoading.value,
-                      ),
-                    ),
+                    Obx(() => _buildFAQButton(context, 'faq_question_1'.tr, () => controller.selectQuestion('faq_question_1'.tr), isLoading: controller.isLoading.value)),
                     const SizedBox(height: 12),
-                    Obx(
-                      () => _buildFAQButton(
-                        context,
-                        'faq_question_2'.tr,
-                        () => controller.selectQuestion('faq_question_2'.tr),
-                        isLoading: controller.isLoading.value,
-                      ),
-                    ),
+                    Obx(() => _buildFAQButton(context, 'faq_question_2'.tr, () => controller.selectQuestion('faq_question_2'.tr), isLoading: controller.isLoading.value)),
                     const SizedBox(height: 12),
-                    Obx(
-                      () => _buildFAQButton(
-                        context,
-                        'faq_question_3'.tr,
-                        () => controller.selectQuestion('faq_question_3'.tr),
-                        isLoading: controller.isLoading.value,
-                      ),
-                    ),
+                    Obx(() => _buildFAQButton(context, 'faq_question_3'.tr, () => controller.selectQuestion('faq_question_3'.tr), isLoading: controller.isLoading.value)),
                     const SizedBox(height: 12),
-                    Obx(
-                      () => _buildFAQButton(
-                        context,
-                        'faq_question_4'.tr,
-                        () => controller.selectQuestion('faq_question_4'.tr),
-                        isLoading: controller.isLoading.value,
-                      ),
-                    ),
+                    Obx(() => _buildFAQButton(context, 'faq_question_4'.tr, () => controller.selectQuestion('faq_question_4'.tr), isLoading: controller.isLoading.value)),
                     const SizedBox(height: 24),
                   ],
                 ),
               ),
             ),
-            // Input Field and Send Button
-            Obx(
-              () => SendTextField(
-                controller: controller.questionController,
-                enabled: !controller.isLoading.value,
-                isLoading: controller.isLoading.value,
-                onSend: controller.sendQuestion,
-              ),
-            ),
+            Obx(() => SendTextField(controller: controller.questionController, enabled: !controller.isLoading.value, isLoading: controller.isLoading.value, onSend: controller.sendQuestion)),
             SizedBox(height: bottomPadding),
           ],
         ),
@@ -361,12 +320,7 @@ class _BottomSheetContent extends StatelessWidget {
     );
   }
 
-  Widget _buildFAQButton(
-    BuildContext context,
-    String text,
-    VoidCallback onTap, {
-    required bool isLoading,
-  }) {
+  Widget _buildFAQButton(BuildContext context, String text, VoidCallback onTap, {required bool isLoading}) {
     return GestureDetector(
       onTap: isLoading ? null : onTap,
       child: Container(
@@ -388,242 +342,321 @@ class WebResultView extends StatefulWidget {
   final VoidCallback? onDownloadStarted;
   final VoidCallback? onDownloadFinished;
 
-  const WebResultView({
-    required this.url,
-    this.annotatedImage,
-    this.onDownloadStarted,
-    this.onDownloadFinished,
-    super.key,
-  });
+  const WebResultView({required this.url, this.annotatedImage, this.onDownloadStarted, this.onDownloadFinished, super.key});
 
   @override
   State<WebResultView> createState() => _WebResultViewState();
 }
 
 class _WebResultViewState extends State<WebResultView> {
-  static const MethodChannel _platformChannel = MethodChannel(
-    'usb_camera_plugin',
-  );
   late final WebViewController _controller;
   bool isLoading = true;
-  double contentHeight = 150;
+  double contentHeight = 400;
+  String? _lastDownloadedUrl;
+  DateTime? _lastDownloadTime;
 
   @override
   void initState() {
     super.initState();
-
+    print("URL${widget.url}");
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(Colors.transparent)
-      // 🔹 Receive Base64 PDF from JS
       ..addJavaScriptChannel(
         'BlobPDF',
         onMessageReceived: (JavaScriptMessage message) async {
           final msg = message.message;
+
           if (msg.startsWith('LOG: ')) {
             log('WebView: ${msg.substring(5)}');
             return;
           }
-          try {
-            widget.onDownloadFinished?.call();
-            final base64 = msg;
-            // Decode Base64 into raw bytes
-            final bytes = base64Decode(base64);
 
-            // Persist PDF to a shareable directory
-            // On Android: use temporary/cache directory so it's covered by FileProvider <cache-path>
-            // On other platforms: fall back to application documents directory
-            final dir = Platform.isAndroid
-                ? await getTemporaryDirectory()
-                : await getApplicationDocumentsDirectory();
-
-            final file = File(
-              '${dir.path}/Reporte_UltraScan_${DateTime.now().millisecondsSinceEpoch}.pdf',
-            );
-            await file.writeAsBytes(bytes, flush: true);
-
-            // Ask native Android code (MainActivity) to open this PDF using FileProvider
-            await _WebResultViewState._platformChannel.invokeMethod(
-              'openPdf',
-              file.path,
-            );
-          } catch (e, s) {
-            widget.onDownloadFinished?.call();
-            log('Failed to open PDF from WebView: $e\n$s');
+          if (msg.startsWith('HEIGHT: ')) {
+            final hStr = msg.substring(8);
+            final h = double.tryParse(hStr);
+            if (mounted && h != null && h != contentHeight) {
+              setState(() => contentHeight = h.clamp(150, 5500));
+            }
+            return;
           }
+
+          if (msg.startsWith('DOWNLOAD_URL: ')) {
+            final url = msg.substring(14);
+            _downloadFileToPublicFolder(url);
+            return;
+          }
+
+          // ✅ NEW: File picker message from JavaScript
+          if (msg.startsWith('FILE_PICKER:')) {
+            final isMultiple = msg.contains('multiple');
+            await _handleFilePicker(isMultiple);
+            return;
+          }
+
+          _handleBlobContent(msg);
         },
       )
       ..setNavigationDelegate(
         NavigationDelegate(
-          // 🔹 Inject interceptor EARLY
           onPageStarted: (_) async {
             setState(() => isLoading = true);
-            await _injectBlobInterceptor();
+            await _injectInterceptors();
           },
-          onPageFinished: (_) async {
-            await _updateHeight();
+          onPageFinished: (_) async => _updateHeight(),
+          onWebResourceError: (_) => setState(() => isLoading = false),
+          onNavigationRequest: (request) async {
+            if (request.url.toLowerCase().endsWith('.pdf')) {
+              final Uri url = Uri.parse(request.url);
+              if (await canLaunchUrl(url)) {
+                await launchUrl(url, mode: LaunchMode.externalApplication);
+              }
+              return NavigationDecision.prevent;
+            }
+            return NavigationDecision.navigate;
           },
-          onWebResourceError: (error) {
-            setState(() => isLoading = false);
-          },
+          // ✅ Remove onFileSelector – we're using JavaScript interceptor instead
         ),
       )
       ..loadRequest(Uri.parse(widget.url));
   }
 
-  // 🔹 Trigger PDF Download via JS
-  void triggerDownload() {
-    widget.onDownloadStarted?.call();
-    _controller.runJavaScript('''
-      (function() {
-        // Try to find the download button on the page
-        // Common selectors for download buttons (adjust based on actual page structure if known)
-        const selectors = [
-          'button[id*="download"]',
-          'button[class*="download"]',
-          'a[id*="download"]',
-          'a[class*="download"]',
-           '[title*="Download"]',
-           '[aria-label*="Download"]'
-        ];
-        
-        for (const selector of selectors) {
-          const btn = document.querySelector(selector);
-          if (btn) {
-            btn.click();
-            return;
-          }
-        }
-        
-        // Fallback: If jsPDF is present, try calling save directly if we can find the instance
-        // But since we patched jsPDF.save, it should work if we just trigger the UI button.
-      })();
-    ''');
-  }
+  /// =========================
+  /// HANDLE FILE PICKER FROM JS
+  /// =========================
+  Future<void> _handleFilePicker(bool isMultiple) async {
+    final ImagePicker picker = ImagePicker();
 
-  // 🔹 JS: Intercept BLOB PDFs and send to Flutter
-  Future<void> _injectBlobInterceptor() async {
-    await _controller.runJavaScript('''
-      (function () {
-        if (window.__blobInterceptorInjected) return;
-        window.__blobInterceptorInjected = true;
+    if (isMultiple) {
+      // Multiple images select
+      final List<XFile> images = await picker.pickMultiImage();
+      if (images.isEmpty) return;
 
-        // ================================
-        // 1) INTERCEPT BLOB: URL CLICKS
-        // ================================
-        document.addEventListener('click', function(e) {
-          const link = e.target.closest('a');
-          if (!link || !link.href) return;
+      // Convert each image to base64 and send to JavaScript
+      for (final image in images) {
+        final bytes = await image.readAsBytes();
+        final base64 = base64Encode(bytes);
+        final fileName = image.name;
+        final mimeType = image.mimeType ?? 'image/jpeg';
 
-          if (link.href.startsWith('blob:')) {
-            e.preventDefault();
-
-            fetch(link.href)
-              .then(res => res.blob())
-              .then(blob => {
-                const reader = new FileReader();
-                reader.onloadend = function () {
-                  const base64data = reader.result.split(',')[1];
-                  BlobPDF.postMessage(base64data);
-                };
-                reader.readAsDataURL(blob);
-              });
-          }
-        }, true);
-
-        function log(m) {
-          if (window.BlobPDF) BlobPDF.postMessage('LOG: ' + m);
-          console.log(m);
-        }
-
-        // ==========================================
-        // 2) PATCH jsPDF.save() TO WORK IN WEBVIEW
-        // ==========================================
-        function patchJsPDF() {
-          try {
-            var JsPDFCtor = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
-            if (!JsPDFCtor) {
-               log("jsPDF not found yet");
-               return;
+        // Inject file into the input field using JavaScript
+        await _controller.runJavaScript('''
+          (function() {
+            const input = document.querySelector('input[type="file"]');
+            if (!input) return;
+            
+            // Create a File object from base64
+            const byteCharacters = atob("$base64");
+            const byteNumbers = new Array(byteCharacters.length);
+            for (let i = 0; i < byteCharacters.length; i++) {
+              byteNumbers[i] = byteCharacters.charCodeAt(i);
             }
-            if (JsPDFCtor.__ultraPatched) return;
-
-            var proto = JsPDFCtor.API || JsPDFCtor.prototype;
-            if (!proto) return;
-            if (proto.__originalSave) return;
-
-            log("Patching jsPDF.save()");
-            proto.__originalSave = proto.save;
-            proto.save = function (fileName) {
-              log("jsPDF.save() intercepted. Generating PDF...");
-              try {
-                var dataUri = this.output('datauristring');
-                var base64 = String(dataUri).split(',')[1];
-                if (window.BlobPDF) {
-                  BlobPDF.postMessage(base64);
-                } else if (typeof proto.__originalSave === 'function') {
-                  proto.__originalSave.call(this, fileName || 'document.pdf');
-                }
-              } catch (err) {
-                log("Error generating PDF blob: " + err.message);
-                if (typeof proto.__originalSave === 'function') {
-                  proto.__originalSave.call(this, fileName || 'document.pdf');
-                }
+            const byteArray = new Uint8Array(byteNumbers);
+            const file = new File([byteArray], "$fileName", { type: "$mimeType" });
+            
+            // Use DataTransfer to set files (supports multiple)
+            const dataTransfer = new DataTransfer();
+            // Get existing files if any (for multiple selection)
+            if (input.files) {
+              for (let i = 0; i < input.files.length; i++) {
+                dataTransfer.items.add(input.files[i]);
               }
-            };
-            JsPDFCtor.__ultraPatched = true;
-          } catch (e) {
-            log("Patch failed: " + e.message);
-          }
-        }
+            }
+            dataTransfer.items.add(file);
+            input.files = dataTransfer.files;
+            
+            // Trigger change event
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+          })();
+        ''');
+        // Small delay to avoid race conditions
+        await Future.delayed(const Duration(milliseconds: 100));
+      }
+    } else {
+      // Single image select
+      final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+      if (image == null) return;
 
-        // Try patching once DOM is ready
-        if (document.readyState === 'loading') {
-          document.addEventListener('DOMContentLoaded', patchJsPDF);
-        } else {
-          patchJsPDF();
-        }
+      final bytes = await image.readAsBytes();
+      final base64 = base64Encode(bytes);
+      final fileName = image.name;
+      final mimeType = image.mimeType ?? 'image/jpeg';
 
-        // Also poll a few times in case jsPDF loads late
-        var tries = 0;
-        var interval = setInterval(function () {
-          tries++;
-          if (window.jspdf || window.jsPDF || tries > 10) {
-            patchJsPDF();
-            clearInterval(interval);
+      await _controller.runJavaScript('''
+        (function() {
+          const input = document.querySelector('input[type="file"]');
+          if (!input) return;
+          
+          const byteCharacters = atob("$base64");
+          const byteNumbers = new Array(byteCharacters.length);
+          for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
           }
-        }, 500);
-
-        // Also poll a few times in case jsPDF loads late
-        var tries = 0;
-        var interval = setInterval(function () {
-          tries++;
-          if (window.jspdf || window.jsPDF) {
-            patchJsPDF();
-            clearInterval(interval);
-          } else if (tries > 20) {
-            clearInterval(interval);
-            log("Giving up on jsPDF patch");
-          }
-        }, 1000);
-      })();
-    ''');
+          const byteArray = new Uint8Array(byteNumbers);
+          const file = new File([byteArray], "$fileName", { type: "$mimeType" });
+          
+          const dataTransfer = new DataTransfer();
+          dataTransfer.items.add(file);
+          input.files = dataTransfer.files;
+          
+          input.dispatchEvent(new Event('change', { bubbles: true }));
+        })();
+      ''');
+    }
   }
 
-  // 🔹 Auto height calculation
+  /// =========================
+  /// JS INTERCEPTORS (UPDATED)
+  /// =========================
+  Future<void> _injectInterceptors() async {
+    await _controller.runJavaScript('''
+(function () {
+  if (window.__interceptorsInjected) return;
+  window.__interceptorsInjected = true;
+
+  function log(m) { if (window.BlobPDF) BlobPDF.postMessage('LOG: ' + m); }
+
+  // ========== BLOB INTERCEPT (unchanged) ==========
+  document.addEventListener('click', function(e) {
+    const link = e.target.closest('a');
+    if (link && link.href && link.href.startsWith('blob:')) {
+      e.preventDefault();
+      fetch(link.href).then(r => r.blob()).then(b => {
+        const reader = new FileReader();
+        reader.onloadend = () => BlobPDF.postMessage(reader.result.split(',')[1]);
+        reader.readAsDataURL(b);
+      });
+    }
+  }, true);
+
+  // ========== COPY LINK INTERCEPT (unchanged) ==========
+  let lastUrl = '';
+  let lastTime = 0;
+
+  function handleCopyText(text) {
+    const now = Date.now();
+    const trimmed = text ? text.toString().trim() : '';
+    if (trimmed.startsWith('http')) {
+      if (trimmed === lastUrl && (now - lastTime) < 2000) return true;
+      lastUrl = trimmed;
+      lastTime = now;
+      if (window.BlobPDF) {
+        BlobPDF.postMessage('DOWNLOAD_URL: ' + trimmed);
+      }
+      return true;
+    }
+    return false;
+  }
+
+  if (navigator.clipboard) {
+    const originalWrite = navigator.clipboard.writeText;
+    navigator.clipboard.writeText = function(text) {
+      if (handleCopyText(text)) return Promise.resolve();
+      return originalWrite.apply(navigator.clipboard, arguments);
+    };
+  }
+
+  document.addEventListener('copy', function(e) {
+    let text = window.getSelection().toString();
+    if (!text && e.clipboardData) {
+      text = e.clipboardData.getData('text');
+    }
+    handleCopyText(text);
+  });
+
+  // ========== NEW: FILE INPUT INTERCEPT ==========
+  document.addEventListener('click', function(e) {
+    const input = e.target.closest('input[type="file"]');
+    if (input) {
+      e.preventDefault();  // Stop default file dialog
+      const isMultiple = input.hasAttribute('multiple');
+      if (window.BlobPDF) {
+        BlobPDF.postMessage('FILE_PICKER:' + (isMultiple ? 'multiple' : 'single'));
+      }
+    }
+  }, true);
+
+  // ========== HEIGHT DETECTION (unchanged) ==========
+  function sendHeight() {
+    try {
+      let maxBottom = 0;
+      const elements = document.querySelectorAll('body *');
+      for (let el of elements) {
+        const rect = el.getBoundingClientRect();
+        if (rect.width === 0 || rect.height === 0) continue;
+        const style = window.getComputedStyle(el);
+        if (style.display === 'none' || style.visibility === 'hidden' || parseFloat(style.opacity) === 0) continue;
+        const bottom = rect.bottom + window.scrollY;
+        if (bottom > maxBottom) maxBottom = bottom;
+      }
+      if (window.BlobPDF) {
+        BlobPDF.postMessage('HEIGHT: ' + Math.ceil(maxBottom));
+      }
+    } catch(e) {}
+  }
+
+  new ResizeObserver(sendHeight).observe(document.body);
+  new MutationObserver(sendHeight).observe(document.body, { childList: true, subtree: true });
+  window.addEventListener('scroll', sendHeight);
+  sendHeight();
+})();
+''');
+  }
+
+  /// =========================
+  /// REST OF FILE — UNCHANGED
+  /// =========================
+
+  Future<void> _handleBlobContent(String base64) async {
+    try {
+      final bytes = base64Decode(base64);
+      final dir = Platform.isAndroid ? await getTemporaryDirectory() : await getApplicationDocumentsDirectory();
+
+      final file = File('${dir.path}/Reporte_${DateTime.now().millisecondsSinceEpoch}.pdf');
+      await file.writeAsBytes(bytes);
+      await OpenFile.open(file.path);
+    } catch (e) {
+      log('Blob error: $e');
+    }
+  }
+
+  Future<void> _downloadFileToPublicFolder(String url) async {
+    final now = DateTime.now();
+
+    if (_lastDownloadedUrl == url && _lastDownloadTime != null && now.difference(_lastDownloadTime!).inSeconds < 2) {
+      return;
+    }
+
+    _lastDownloadedUrl = url;
+    _lastDownloadTime = now;
+
+    try {
+      final dio = Dio();
+      String savePath = '';
+
+      if (Platform.isAndroid) {
+        savePath = '/storage/emulated/0/Download/Reporte_UltraScan_${DateTime.now().millisecondsSinceEpoch}.pdf';
+      } else {
+        final dir = await getApplicationDocumentsDirectory();
+        savePath = '${dir.path}/Reporte_UltraScan_${DateTime.now().millisecondsSinceEpoch}.pdf';
+      }
+
+      await dio.download(url, savePath);
+      await OpenFile.open(savePath);
+    } catch (e) {
+      _lastDownloadedUrl = null;
+      log('Download failed: $e');
+    }
+  }
+
   Future<void> _updateHeight() async {
     try {
-      final height = await _controller.runJavaScriptReturningResult(
-        'Math.max(document.body.scrollHeight, document.documentElement.scrollHeight)',
-      );
-
-      final h = double.tryParse(
-        height.toString().replaceAll(RegExp(r'[^0-9.]'), ''),
-      );
+      final res = await _controller.runJavaScriptReturningResult('Math.max(document.body.scrollHeight, document.documentElement.scrollHeight)');
+      final h = double.tryParse(res.toString().replaceAll(RegExp(r'[^0-9.]'), ''));
 
       if (mounted && h != null) {
         setState(() {
-          contentHeight = h.clamp(150, 3000);
+          contentHeight = h.clamp(150, 5500);
           isLoading = false;
         });
       }
@@ -642,9 +675,7 @@ class _WebResultViewState extends State<WebResultView> {
         ),
         if (isLoading)
           const Positioned.fill(
-            child: Center(
-              child: CircularProgressIndicator(color: AppColors.goldColor),
-            ),
+            child: Center(child: CircularProgressIndicator(color: AppColors.goldColor)),
           ),
       ],
     );

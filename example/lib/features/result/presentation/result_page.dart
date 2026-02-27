@@ -351,6 +351,7 @@ class WebResultView extends StatefulWidget {
 class _WebResultViewState extends State<WebResultView> {
   late final WebViewController _controller;
   bool isLoading = true;
+  bool hasError = false; // ⭐ NEW
   double contentHeight = 400;
   String? _lastDownloadedUrl;
   DateTime? _lastDownloadTime;
@@ -387,7 +388,6 @@ class _WebResultViewState extends State<WebResultView> {
             return;
           }
 
-          // ✅ NEW: File picker message from JavaScript
           if (msg.startsWith('FILE_PICKER:')) {
             final isMultiple = msg.contains('multiple');
             await _handleFilePicker(isMultiple);
@@ -400,11 +400,31 @@ class _WebResultViewState extends State<WebResultView> {
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageStarted: (_) async {
-            setState(() => isLoading = true);
+            setState(() {
+              isLoading = true;
+              hasError = false; // ⭐ reset error
+            });
             await _injectInterceptors();
           },
+
           onPageFinished: (_) async => _updateHeight(),
-          onWebResourceError: (_) => setState(() => isLoading = false),
+
+          // ⭐ NETWORK ERRORS
+          onWebResourceError: (_) {
+            setState(() {
+              isLoading = false;
+              hasError = true;
+            });
+          },
+
+          // ⭐ HTTP ERRORS (404/500)
+          onHttpError: (_) {
+            setState(() {
+              isLoading = false;
+              hasError = true;
+            });
+          },
+
           onNavigationRequest: (request) async {
             if (request.url.toLowerCase().endsWith('.pdf')) {
               final Uri url = Uri.parse(request.url);
@@ -415,12 +435,42 @@ class _WebResultViewState extends State<WebResultView> {
             }
             return NavigationDecision.navigate;
           },
-          // ✅ Remove onFileSelector – we're using JavaScript interceptor instead
         ),
       )
       ..loadRequest(Uri.parse(widget.url));
   }
 
+  /// ⭐ ERROR UI (NEW)
+  Widget _buildErrorUI() {
+    return Container(
+      height: 300,
+      alignment: Alignment.center,
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.cloud_off, size: 60, color: Colors.white70),
+          const SizedBox(height: 16),
+          const Text("Unable to load page", style: TextStyle(fontSize: 18, color: Colors.white)),
+          const SizedBox(height: 10),
+          ElevatedButton(
+            onPressed: () {
+              setState(() {
+                hasError = false;
+                isLoading = true;
+              });
+              _controller.loadRequest(Uri.parse(widget.url));
+            },
+            child: const Text("Retry"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// =========================
+  /// REST OF YOUR CODE — UNCHANGED
+  /// =========================
   /// =========================
   /// HANDLE FILE PICKER FROM JS
   /// =========================
@@ -669,11 +719,15 @@ class _WebResultViewState extends State<WebResultView> {
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        SizedBox(
-          height: contentHeight,
-          child: WebViewWidget(controller: _controller),
-        ),
-        if (isLoading)
+        if (!hasError) // ⭐ hide webview on error
+          SizedBox(
+            height: contentHeight,
+            child: WebViewWidget(controller: _controller),
+          )
+        else
+          _buildErrorUI(),
+
+        if (isLoading && !hasError)
           const Positioned.fill(
             child: Center(child: CircularProgressIndicator(color: AppColors.goldColor)),
           ),

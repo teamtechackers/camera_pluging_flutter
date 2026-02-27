@@ -22,8 +22,8 @@ class _SplashScreenState extends State<SplashScreen> {
 
   Future<void> _navigateToHome() async {
     await Future.delayed(const Duration(seconds: 3));
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    prefs.setString('saved_mac_address', '4E:4F:DA:1C:21:11');
+    // SharedPreferences prefs = await SharedPreferences.getInstance();
+    // prefs.setString('saved_mac_address', '4E:4F:DA:1C:21:11');
     Get.offNamed(AppPages.bodyAreaHome);
   }
 

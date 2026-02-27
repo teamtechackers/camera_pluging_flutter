@@ -75,6 +75,8 @@ class MyApp extends StatelessWidget {
       title: AppConstants.appName,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: AppColors.primary),
+        scaffoldBackgroundColor:
+            AppColors.black, // Prevent white flash during navigation
         useMaterial3: true,
       ),
       translations: AppTranslations(),

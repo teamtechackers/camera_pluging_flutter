@@ -28,6 +28,13 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    precacheImage(const AssetImage(AppAssets.bg), context);
+    precacheImage(AssetImage(AppAssets.bottomsheetBg), context);
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
@@ -35,17 +42,28 @@ class _SplashScreenState extends State<SplashScreen> {
           width: double.infinity,
           height: double.infinity,
           decoration: const BoxDecoration(
-            image: DecorationImage(image: AssetImage(AppAssets.splashBg), fit: BoxFit.cover),
+            image: DecorationImage(
+              image: AssetImage(AppAssets.splashBg),
+              fit: BoxFit.cover,
+            ),
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
               Expanded(
                 flex: 2,
-                child: Center(child: Image.asset(AppAssets.banner, fit: BoxFit.contain)),
+                child: Center(
+                  child: Image.asset(AppAssets.banner, fit: BoxFit.contain),
+                ),
               ),
 
-              Expanded(flex: 5, child: Image.asset(AppAssets.ultraScanMachine, fit: BoxFit.contain)),
+              Expanded(
+                flex: 5,
+                child: Image.asset(
+                  AppAssets.ultraScanMachine,
+                  fit: BoxFit.contain,
+                ),
+              ),
 
               Padding(
                 padding: const EdgeInsets.only(bottom: 20),
@@ -54,7 +72,10 @@ class _SplashScreenState extends State<SplashScreen> {
                   width: double.infinity,
                   margin: const EdgeInsets.symmetric(horizontal: 20),
                   decoration: BoxDecoration(
-                    image: DecorationImage(image: AssetImage(AppAssets.initializingBanner), fit: BoxFit.contain),
+                    image: DecorationImage(
+                      image: AssetImage(AppAssets.initializingBanner),
+                      fit: BoxFit.contain,
+                    ),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,

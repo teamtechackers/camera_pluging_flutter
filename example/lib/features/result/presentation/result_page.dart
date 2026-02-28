@@ -73,13 +73,34 @@ class _ResultPageState extends State<ResultPage> {
 
             /// IMAGE
             if (controller.analysisResponse.analysis?.annotatedImage != null)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                child: AspectRatio(
-                  aspectRatio: 4 / 3,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Image.memory(base64Decode(controller.analysisResponse.analysis!.annotatedImage!.split(',').last), fit: BoxFit.cover),
+              SizedBox(
+                height: 200,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                  child: AspectRatio(
+                    aspectRatio: 4 / 3,
+                    child: GestureDetector(
+                      onTap: () {
+                        // Fullscreen dialog pe image show karna
+                        showDialog(
+                          context: Get.context!,
+                          builder: (_) => Dialog(
+                            backgroundColor: Colors.transparent,
+                            insetPadding: EdgeInsets.all(0),
+                            child: InteractiveViewer(
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(0),
+                                child: Image.memory(base64Decode(controller.analysisResponse.analysis!.annotatedImage!.split(',').last), fit: BoxFit.contain),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.memory(base64Decode(controller.analysisResponse.analysis!.annotatedImage!.split(',').last), fit: BoxFit.cover),
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -352,6 +373,7 @@ class _WebResultViewState extends State<WebResultView> {
   late final WebViewController _controller;
   bool isLoading = true;
   bool hasError = false; // ⭐ NEW
+  bool _showPermanentError = false;
   double contentHeight = 400;
   String? _lastDownloadedUrl;
   DateTime? _lastDownloadTime;
@@ -390,6 +412,7 @@ class _WebResultViewState extends State<WebResultView> {
 
           if (msg.startsWith('FILE_PICKER:')) {
             final isMultiple = msg.contains('multiple');
+            print("MSGES $msg");
             await _handleFilePicker(isMultiple);
             return;
           }
@@ -409,16 +432,26 @@ class _WebResultViewState extends State<WebResultView> {
 
           onPageFinished: (_) async => _updateHeight(),
 
-          // ⭐ NETWORK ERRORS
-          onWebResourceError: (_) {
+          onWebResourceError: (error) {
             setState(() {
-              isLoading = false;
               hasError = true;
+            });
+
+            // Only show error widget if it persists for 2-3 seconds
+            Future.delayed(const Duration(seconds: 2), () {
+              if (mounted && hasError) {
+                setState(() {
+                  _showPermanentError = true;
+                });
+              }
             });
           },
 
-          // ⭐ HTTP ERRORS (404/500)
-          onHttpError: (_) {
+          onHttpError: (error) {
+            final failingUrl = error.response?.uri.toString();
+
+            if (failingUrl == null || !failingUrl.startsWith(widget.url)) return;
+
             setState(() {
               isLoading = false;
               hasError = true;
@@ -468,9 +501,6 @@ class _WebResultViewState extends State<WebResultView> {
     );
   }
 
-  /// =========================
-  /// REST OF YOUR CODE — UNCHANGED
-  /// =========================
   /// =========================
   /// HANDLE FILE PICKER FROM JS
   /// =========================
@@ -524,7 +554,7 @@ class _WebResultViewState extends State<WebResultView> {
       }
     } else {
       // Single image select
-      final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+      final XFile? image = await picker.pickImage(source: ImageSource.camera);
       if (image == null) return;
 
       final bytes = await image.readAsBytes();
@@ -719,7 +749,7 @@ class _WebResultViewState extends State<WebResultView> {
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        if (!hasError) // ⭐ hide webview on error
+        if (!_showPermanentError)
           SizedBox(
             height: contentHeight,
             child: WebViewWidget(controller: _controller),
@@ -727,7 +757,7 @@ class _WebResultViewState extends State<WebResultView> {
         else
           _buildErrorUI(),
 
-        if (isLoading && !hasError)
+        if (isLoading && !_showPermanentError)
           const Positioned.fill(
             child: Center(child: CircularProgressIndicator(color: AppColors.goldColor)),
           ),

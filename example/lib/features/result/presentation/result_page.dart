@@ -372,8 +372,9 @@ class WebResultView extends StatefulWidget {
 class _WebResultViewState extends State<WebResultView> {
   late final WebViewController _controller;
   bool isLoading = true;
-  bool hasError = false; // ⭐ NEW
+  bool hasError = false;
   bool _showPermanentError = false;
+  String? errorMessage;
   double contentHeight = 400;
   String? _lastDownloadedUrl;
   DateTime? _lastDownloadTime;
@@ -389,6 +390,7 @@ class _WebResultViewState extends State<WebResultView> {
         'BlobPDF',
         onMessageReceived: (JavaScriptMessage message) async {
           final msg = message.message;
+          print("MSGGGGG ${msg}");
 
           if (msg.startsWith('LOG: ')) {
             log('WebView: ${msg.substring(5)}');
@@ -412,8 +414,12 @@ class _WebResultViewState extends State<WebResultView> {
 
           if (msg.startsWith('FILE_PICKER:')) {
             final isMultiple = msg.contains('multiple');
-            print("MSGES $msg");
             await _handleFilePicker(isMultiple);
+            return;
+          }
+          if (msg.startsWith('DOWNLOAD_URL_SS:')) {
+            final url = msg.substring(14);
+            _downloadFileToPublicFolder(url);
             return;
           }
 
@@ -425,19 +431,35 @@ class _WebResultViewState extends State<WebResultView> {
           onPageStarted: (_) async {
             setState(() {
               isLoading = true;
-              hasError = false; // ⭐ reset error
+              hasError = false;
             });
             await _injectInterceptors();
           },
 
           onPageFinished: (_) async => _updateHeight(),
 
-          onWebResourceError: (error) {
+          onWebResourceError: (WebResourceError error) {
+            log("WebResourceError: ${error.description}, code: ${error.errorCode}, isMainFrame: ${error.isForMainFrame}");
+
+            // Handle ERR_FILE_NOT_FOUND or any other main resource error immediately
+            final bool isFatalError = error.isForMainFrame ?? true;
+            final bool isFileNotFound = error.description.contains('ERR_FILE_NOT_FOUND') || error.errorCode == -6;
+
+            if (isFatalError || isFileNotFound) {
+              setState(() {
+                hasError = true;
+                _showPermanentError = true;
+                isLoading = false;
+                errorMessage = error.description;
+              });
+              return;
+            }
+
             setState(() {
               hasError = true;
+              errorMessage = error.description;
             });
 
-            // Only show error widget if it persists for 2-3 seconds
             Future.delayed(const Duration(seconds: 2), () {
               if (mounted && hasError) {
                 setState(() {
@@ -448,13 +470,15 @@ class _WebResultViewState extends State<WebResultView> {
           },
 
           onHttpError: (error) {
+            log("onHttpError: ${error.response?.statusCode}, url: ${error.response?.uri}");
             final failingUrl = error.response?.uri.toString();
-
             if (failingUrl == null || !failingUrl.startsWith(widget.url)) return;
 
             setState(() {
               isLoading = false;
               hasError = true;
+              _showPermanentError = true; // Show error for main URL load failure
+              errorMessage = "HTTP Error: ${error.response?.statusCode ?? 'Unknown'}";
             });
           },
 
@@ -473,7 +497,6 @@ class _WebResultViewState extends State<WebResultView> {
       ..loadRequest(Uri.parse(widget.url));
   }
 
-  /// ⭐ ERROR UI (NEW)
   Widget _buildErrorUI() {
     return Container(
       height: 300,
@@ -485,6 +508,16 @@ class _WebResultViewState extends State<WebResultView> {
           const Icon(Icons.cloud_off, size: 60, color: Colors.white70),
           const SizedBox(height: 16),
           const Text("Unable to load page", style: TextStyle(fontSize: 18, color: Colors.white)),
+          if (errorMessage != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              errorMessage!,
+              style: const TextStyle(fontSize: 12, color: Colors.white70),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
           const SizedBox(height: 10),
           ElevatedButton(
             onPressed: () {
@@ -501,31 +534,24 @@ class _WebResultViewState extends State<WebResultView> {
     );
   }
 
-  /// =========================
-  /// HANDLE FILE PICKER FROM JS
-  /// =========================
   Future<void> _handleFilePicker(bool isMultiple) async {
     final ImagePicker picker = ImagePicker();
 
     if (isMultiple) {
-      // Multiple images select
       final List<XFile> images = await picker.pickMultiImage();
       if (images.isEmpty) return;
 
-      // Convert each image to base64 and send to JavaScript
       for (final image in images) {
         final bytes = await image.readAsBytes();
         final base64 = base64Encode(bytes);
         final fileName = image.name;
         final mimeType = image.mimeType ?? 'image/jpeg';
 
-        // Inject file into the input field using JavaScript
         await _controller.runJavaScript('''
           (function() {
             const input = document.querySelector('input[type="file"]');
             if (!input) return;
             
-            // Create a File object from base64
             const byteCharacters = atob("$base64");
             const byteNumbers = new Array(byteCharacters.length);
             for (let i = 0; i < byteCharacters.length; i++) {
@@ -534,9 +560,7 @@ class _WebResultViewState extends State<WebResultView> {
             const byteArray = new Uint8Array(byteNumbers);
             const file = new File([byteArray], "$fileName", { type: "$mimeType" });
             
-            // Use DataTransfer to set files (supports multiple)
             const dataTransfer = new DataTransfer();
-            // Get existing files if any (for multiple selection)
             if (input.files) {
               for (let i = 0; i < input.files.length; i++) {
                 dataTransfer.items.add(input.files[i]);
@@ -545,15 +569,12 @@ class _WebResultViewState extends State<WebResultView> {
             dataTransfer.items.add(file);
             input.files = dataTransfer.files;
             
-            // Trigger change event
             input.dispatchEvent(new Event('change', { bubbles: true }));
           })();
         ''');
-        // Small delay to avoid race conditions
         await Future.delayed(const Duration(milliseconds: 100));
       }
     } else {
-      // Single image select
       final XFile? image = await picker.pickImage(source: ImageSource.camera);
       if (image == null) return;
 
@@ -585,34 +606,190 @@ class _WebResultViewState extends State<WebResultView> {
     }
   }
 
-  /// =========================
-  /// JS INTERCEPTORS (UPDATED)
-  /// =========================
   Future<void> _injectInterceptors() async {
     await _controller.runJavaScript('''
 (function () {
   if (window.__interceptorsInjected) return;
   window.__interceptorsInjected = true;
 
-  function log(m) { if (window.BlobPDF) BlobPDF.postMessage('LOG: ' + m); }
+  // Forward console.log to Flutter
+  const originalConsoleLog = console.log;
+  console.log = function(...args) {
+    originalConsoleLog.apply(console, args);
+    if (window.BlobPDF) {
+      window.BlobPDF.postMessage('LOG: ' + args.join(' '));
+    }
+  };
 
-  // ========== BLOB INTERCEPT (unchanged) ==========
+  // ========== BLOB STORAGE ==========
+  const blobMap = new Map();
+
+  const originalCreateObjectURL = window.URL.createObjectURL;
+  window.URL.createObjectURL = function(blob) {
+    const url = originalCreateObjectURL.call(this, blob);
+    blobMap.set(url, blob);
+    console.log('📦 Blob created:', url);
+    return url;
+  };
+
+  const originalRevokeObjectURL = window.URL.revokeObjectURL;
+  window.URL.revokeObjectURL = function(url) {
+    blobMap.delete(url);
+    originalRevokeObjectURL.call(this, url);
+  };
+
+  // ========== INTERCEPT ANCHOR CLICK ==========
+  const anchorProtoClick = HTMLAnchorElement.prototype.click;
+  HTMLAnchorElement.prototype.click = function() {
+    if (this.href && this.href.startsWith('blob:')) {
+      console.log('📥 Anchor click with blob URL:', this.href);
+      const blob = blobMap.get(this.href);
+      if (blob) {
+        sendBlobToFlutter(blob);
+        return;
+      }
+    }
+    return anchorProtoClick.call(this);
+  };
+
+  // ========== INTERCEPT LOCATION CHANGES ==========
+  // location.href setter
+  const desc = Object.getOwnPropertyDescriptor(window, 'location');
+  if (desc && desc.configurable) {
+    Object.defineProperty(window, 'location', {
+      get: function() { return desc.get.call(this); },
+      set: function(val) {
+        if (typeof val === 'string' && val.startsWith('blob:')) {
+          console.log('📍 location.href set to blob:', val);
+          const blob = blobMap.get(val);
+          if (blob) {
+            sendBlobToFlutter(blob);
+            return;
+          }
+        }
+        desc.set.call(this, val);
+      }
+    });
+  }
+
+  // location.replace
+  const originalReplace = window.location.replace;
+  window.location.replace = function(url) {
+    if (url && typeof url === 'string' && url.startsWith('blob:')) {
+      console.log('🔄 location.replace with blob:', url);
+      const blob = blobMap.get(url);
+      if (blob) {
+        sendBlobToFlutter(blob);
+        return;
+      }
+    }
+    return originalReplace.call(this, url);
+  };
+
+  // location.assign
+  const originalAssign = window.location.assign;
+  window.location.assign = function(url) {
+    if (url && typeof url === 'string' && url.startsWith('blob:')) {
+      console.log('🔀 location.assign with blob:', url);
+      const blob = blobMap.get(url);
+      if (blob) {
+        sendBlobToFlutter(blob);
+        return;
+      }
+    }
+    return originalAssign.call(this, url);
+  };
+
+  // ========== INTERCEPT WINDOW.OPEN ==========
+  const originalWindowOpen = window.open;
+  window.open = function(url, name, features) {
+    if (url && typeof url === 'string' && url.startsWith('blob:')) {
+      console.log('🪟 window.open with blob URL:', url);
+      const blob = blobMap.get(url);
+      if (blob) {
+        sendBlobToFlutter(blob);
+        return null;
+      }
+    }
+    return originalWindowOpen.call(this, url, name, features);
+  };
+
+  // ========== INTERCEPT msSaveOrOpenBlob (Edge legacy) ==========
+  if (window.navigator && window.navigator.msSaveOrOpenBlob) {
+    const originalMsSave = window.navigator.msSaveOrOpenBlob;
+    window.navigator.msSaveOrOpenBlob = function(blob, filename) {
+      console.log('📁 msSaveOrOpenBlob called', filename);
+      sendBlobToFlutter(blob);
+      // Optionally call original? Usually we want to prevent default.
+      // return originalMsSave.call(this, blob, filename);
+    };
+  }
+
+  // ========== HELPER: send blob to Flutter ==========
+  function sendBlobToFlutter(blob) {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64 = reader.result.split(',')[1];
+      if (window.BlobPDF) {
+        BlobPDF.postMessage(base64);
+      }
+    };
+    reader.readAsDataURL(blob);
+  }
+
+  // ========== INTERCEPT CLICK ON BLOB LINKS (already present, but keep) ==========
   document.addEventListener('click', function(e) {
     const link = e.target.closest('a');
     if (link && link.href && link.href.startsWith('blob:')) {
       e.preventDefault();
-      fetch(link.href).then(r => r.blob()).then(b => {
-        const reader = new FileReader();
-        reader.onloadend = () => BlobPDF.postMessage(reader.result.split(',')[1]);
-        reader.readAsDataURL(b);
-      });
+      console.log('📦 Blob link clicked (intercepted):', link.href);
+      fetch(link.href).then(r => r.blob()).then(b => sendBlobToFlutter(b));
     }
   }, true);
 
-  // ========== COPY LINK INTERCEPT (unchanged) ==========
+  // ========== INTERCEPT FETCH FOR PDF RESPONSES ==========
+  const originalFetch = window.fetch;
+  window.fetch = function(...args) {
+    return originalFetch.apply(this, args).then(async response => {
+      // Check if this is a PDF request (optional)
+      const url = args[0];
+      if (typeof url === 'string' && url.includes('.pdf')) {
+        const cloned = response.clone();
+        const blob = await cloned.blob();
+        if (blob.type === 'application/pdf') {
+          console.log('📄 Fetch intercepted PDF:', url);
+          sendBlobToFlutter(blob);
+        }
+      }
+      return response;
+    });
+  };
+
+  // ========== INTERCEPT XMLHttpRequest FOR PDF RESPONSES ==========
+  const XHROpen = XMLHttpRequest.prototype.open;
+  const XHRSend = XMLHttpRequest.prototype.send;
+  XMLHttpRequest.prototype.open = function(method, url, ...rest) {
+    this._url = url;
+    return XHROpen.call(this, method, url, ...rest);
+  };
+  XMLHttpRequest.prototype.send = function(...args) {
+    this.addEventListener('load', function() {
+      if (this._url.includes('.pdf') && this.responseType === 'blob' && this.response) {
+        console.log('📄 XHR intercepted PDF:', this._url);
+        sendBlobToFlutter(this.response);
+      }
+    });
+    return XHRSend.call(this, ...args);
+  };
+
+  // ========== REMAINING INTERCEPTORS (copy, file input, download button, height) ==========
+  // ... (paste your existing copy, file input, download button, and height code here)
+  // Make sure to include everything after this point exactly as you had it.
+  // I'll include a placeholder – you need to copy the rest from your current code.
+
+  // ========== COPY LINK INTERCEPT ==========
   let lastUrl = '';
   let lastTime = 0;
-
   function handleCopyText(text) {
     const now = Date.now();
     const trimmed = text ? text.toString().trim() : '';
@@ -627,7 +804,6 @@ class _WebResultViewState extends State<WebResultView> {
     }
     return false;
   }
-
   if (navigator.clipboard) {
     const originalWrite = navigator.clipboard.writeText;
     navigator.clipboard.writeText = function(text) {
@@ -635,7 +811,6 @@ class _WebResultViewState extends State<WebResultView> {
       return originalWrite.apply(navigator.clipboard, arguments);
     };
   }
-
   document.addEventListener('copy', function(e) {
     let text = window.getSelection().toString();
     if (!text && e.clipboardData) {
@@ -644,11 +819,11 @@ class _WebResultViewState extends State<WebResultView> {
     handleCopyText(text);
   });
 
-  // ========== NEW: FILE INPUT INTERCEPT ==========
+  // ========== FILE INPUT INTERCEPT ==========
   document.addEventListener('click', function(e) {
     const input = e.target.closest('input[type="file"]');
     if (input) {
-      e.preventDefault();  // Stop default file dialog
+      e.preventDefault();
       const isMultiple = input.hasAttribute('multiple');
       if (window.BlobPDF) {
         BlobPDF.postMessage('FILE_PICKER:' + (isMultiple ? 'multiple' : 'single'));
@@ -656,7 +831,39 @@ class _WebResultViewState extends State<WebResultView> {
     }
   }, true);
 
-  // ========== HEIGHT DETECTION (unchanged) ==========
+  // ========== DOWNLOAD BUTTON INTERCEPT ==========
+  document.body.addEventListener('click', function(e) {
+    console.log('🔧 Download interceptor RUNNING, phase =', e.eventPhase);
+    const btn = e.target.closest(
+      '#downloadBtn, button[data-download-url], button[data-url], ' +
+      'button[data-href], a.download, button.download, ' +
+      'a[download], #screenshotBtn, .download-btn, .screenshot-btn, ' +
+      '[data-download-url], [data-url]'
+    );
+
+    if (btn) {
+      e.preventDefault();
+      console.log('🔥 Download button matched:', btn, 'tagName=' + btn.tagName, 'id=' + btn.id);
+      let link = btn.getAttribute('data-download-url') ||
+                 btn.getAttribute('data-url') ||
+                 btn.getAttribute('data-href') ||
+                 btn.getAttribute('href') ||
+                 btn.dataset.url;
+      if (link) {
+        const absoluteUrl = new URL(link, window.location.href).href;
+        console.log('📎 Found link:', absoluteUrl);
+        if (window.BlobPDF) {
+          BlobPDF.postMessage('DOWNLOAD_URL_SS: ' + absoluteUrl);
+        }
+      } else {
+        console.log('🔍 No direct link – waiting for blob');
+      }
+    } else {
+      console.log('❌ No button matched for this click. Target =', e.target);
+    }
+  }, true);
+
+  // ========== HEIGHT DETECTION ==========
   function sendHeight() {
     try {
       let maxBottom = 0;
@@ -683,15 +890,10 @@ class _WebResultViewState extends State<WebResultView> {
 ''');
   }
 
-  /// =========================
-  /// REST OF FILE — UNCHANGED
-  /// =========================
-
   Future<void> _handleBlobContent(String base64) async {
     try {
       final bytes = base64Decode(base64);
       final dir = Platform.isAndroid ? await getTemporaryDirectory() : await getApplicationDocumentsDirectory();
-
       final file = File('${dir.path}/Reporte_${DateTime.now().millisecondsSinceEpoch}.pdf');
       await file.writeAsBytes(bytes);
       await OpenFile.open(file.path);
@@ -715,7 +917,9 @@ class _WebResultViewState extends State<WebResultView> {
       String savePath = '';
 
       if (Platform.isAndroid) {
-        savePath = '/storage/emulated/0/Download/Reporte_UltraScan_${DateTime.now().millisecondsSinceEpoch}.pdf';
+        // Using app-specific directory to avoid storage permission issues
+        final dir = await getApplicationDocumentsDirectory();
+        savePath = '${dir.path}/Reporte_UltraScan_${DateTime.now().millisecondsSinceEpoch}.pdf';
       } else {
         final dir = await getApplicationDocumentsDirectory();
         savePath = '${dir.path}/Reporte_UltraScan_${DateTime.now().millisecondsSinceEpoch}.pdf';
@@ -733,7 +937,6 @@ class _WebResultViewState extends State<WebResultView> {
     try {
       final res = await _controller.runJavaScriptReturningResult('Math.max(document.body.scrollHeight, document.documentElement.scrollHeight)');
       final h = double.tryParse(res.toString().replaceAll(RegExp(r'[^0-9.]'), ''));
-
       if (mounted && h != null) {
         setState(() {
           contentHeight = h.clamp(150, 5500);
@@ -756,7 +959,6 @@ class _WebResultViewState extends State<WebResultView> {
           )
         else
           _buildErrorUI(),
-
         if (isLoading && !_showPermanentError)
           const Positioned.fill(
             child: Center(child: CircularProgressIndicator(color: AppColors.goldColor)),

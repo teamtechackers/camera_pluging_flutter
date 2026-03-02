@@ -68,10 +68,15 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Ensure background image is precached before building
+    precacheImage(const AssetImage(AppAssets.bg), context);
+
     return GetMaterialApp(
       title: AppConstants.appName,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: AppColors.primary),
+        scaffoldBackgroundColor:
+            AppColors.black, // Prevent white flash during navigation
         useMaterial3: true,
       ),
       translations: AppTranslations(),

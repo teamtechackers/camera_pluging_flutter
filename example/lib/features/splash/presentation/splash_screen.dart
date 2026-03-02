@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/constants/app/app_assets.dart';
 import '../../../core/constants/ui/app_text_styles.dart';
@@ -21,7 +22,16 @@ class _SplashScreenState extends State<SplashScreen> {
 
   Future<void> _navigateToHome() async {
     await Future.delayed(const Duration(seconds: 3));
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    prefs.setString('saved_mac_address', '4E:4F:DA:1C:21:11');
     Get.offNamed(AppPages.bodyAreaHome);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    precacheImage(const AssetImage(AppAssets.bg), context);
+    precacheImage(AssetImage(AppAssets.bottomsheetBg), context);
   }
 
   @override
@@ -40,17 +50,12 @@ class _SplashScreenState extends State<SplashScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-
               Expanded(
                 flex: 2,
                 child: Center(
-                  child: Image.asset(
-                    AppAssets.banner,
-                    fit: BoxFit.contain,
-                  ),
+                  child: Image.asset(AppAssets.banner, fit: BoxFit.contain),
                 ),
               ),
-
 
               Expanded(
                 flex: 5,
@@ -59,7 +64,6 @@ class _SplashScreenState extends State<SplashScreen> {
                   fit: BoxFit.contain,
                 ),
               ),
-
 
               Padding(
                 padding: const EdgeInsets.only(bottom: 20),

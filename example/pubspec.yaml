@@ -2,7 +2,7 @@ name: usb_camera_plugin_example
 description: "Demonstrates how to use the usb_camera_plugin plugin."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
-publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+publish_to: "none" # Remove this line if you wish to publish to pub.dev
 
 environment:
   sdk: ^3.8.1
@@ -40,8 +40,9 @@ dependencies:
   tflite_flutter: ^0.12.1
   image: ^3.3.0
   flutter_gemini: ^3.0.0
-  webview_flutter: ^4.13.0
-  webview_flutter_android: ^4.10.1
+  webview_flutter: ^4.4.0
+  webview_flutter_android: ^3.16.0 # check latest versions
+  webview_flutter_wkwebview: ^3.13.0
   url_launcher: ^6.3.1
   open_file: ^3.5.2
   camera: ^0.11.0+2
@@ -67,7 +68,6 @@ dev_dependencies:
 
 # The following section is specific to Flutter packages.
 flutter:
-
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
   # the material Icons class.
@@ -122,7 +122,6 @@ flutter:
       fonts:
         - asset: assets/fonts/Roboto-Regular.ttf
           weight: 400
-
 
     # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package

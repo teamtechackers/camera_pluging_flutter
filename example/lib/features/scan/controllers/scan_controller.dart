@@ -141,7 +141,7 @@ class ScanController extends GetxController with WidgetsBindingObserver {
       final sdkInt = androidInfo.version.sdkInt;
       log('Android SDK Version: $sdkInt');
 
-      // For Android 13+, image_picker usually handles things without manual photos permission 
+      // For Android 13+, image_picker usually handles things without manual photos permission
       // if using modern system picker. We'll still check but let it proceed if it fails.
       if (Platform.isAndroid && sdkInt < 33) {
         final status = await Permission.storage.status;
@@ -244,7 +244,6 @@ class ScanController extends GetxController with WidgetsBindingObserver {
       if (kDebugMode) {
         print('🔍 Checking for captured image...');
       }
-
 
       final imagePath = await _usbCameraPlugin.getLastCapturedImage();
 
@@ -415,14 +414,16 @@ class ScanController extends GetxController with WidgetsBindingObserver {
       try {
         if (analysisResponse.analysis?.annotatedImage != null) {
           await ImageUploadUtils.uploadAnnotatedImageToServer(
-              analysisResponse.analysis!.annotatedImage!);
+            analysisResponse.analysis!.annotatedImage!,
+          );
         }
       } catch (e) {
         log('⚠️ Image upload failed but proceeding to result: $e');
       }
 
       // Navigate to results screen
-      Get.toNamed(AppPages.resultPage, arguments: analysisResponse);
+      await Get.toNamed(AppPages.resultPage, arguments: analysisResponse);
+      await Future.delayed(const Duration(milliseconds: 50));
 
       // Clear selected image after navigation (optional)
       selectedImage.value = null;

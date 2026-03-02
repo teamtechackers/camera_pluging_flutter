@@ -414,7 +414,8 @@ class _WebResultViewState extends State<WebResultView> {
 
           if (msg.startsWith('FILE_PICKER:')) {
             final isMultiple = msg.contains('multiple');
-            await _handleFilePicker(isMultiple);
+            final isCamera = msg.endsWith(':camera');
+            await _handleFilePicker(isMultiple, isCamera);
             return;
           }
           if (msg.startsWith('DOWNLOAD_URL_SS:')) {
@@ -483,6 +484,26 @@ class _WebResultViewState extends State<WebResultView> {
           },
 
           onNavigationRequest: (request) async {
+            if (request.url.startsWith('blob:')) {
+              log('❌ Blocked Flutter from navigating to a blob URL to prevent crash: ${request.url}');
+              
+              // Tell Javascript to fetch the specific Blob URL it just tried to navigate to and send to Flutter
+              _controller.runJavaScript('''
+                (function() {
+                  const blobUrl = "${request.url}";
+                  fetch(blobUrl).then(r => r.blob()).then(blob => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                      const base64 = reader.result.split(',')[1];
+                      if (window.BlobPDF) window.BlobPDF.postMessage(base64);
+                    };
+                    reader.readAsDataURL(blob);
+                  }).catch(e => console.log('Failed to fetch intercepted blob: ', e));
+                })();
+              ''');
+
+              return NavigationDecision.prevent;
+            }
             if (request.url.toLowerCase().endsWith('.pdf')) {
               final Uri url = Uri.parse(request.url);
               if (await canLaunchUrl(url)) {
@@ -534,7 +555,7 @@ class _WebResultViewState extends State<WebResultView> {
     );
   }
 
-  Future<void> _handleFilePicker(bool isMultiple) async {
+  Future<void> _handleFilePicker(bool isMultiple, bool isCamera) async {
     final ImagePicker picker = ImagePicker();
 
     if (isMultiple) {
@@ -575,7 +596,9 @@ class _WebResultViewState extends State<WebResultView> {
         await Future.delayed(const Duration(milliseconds: 100));
       }
     } else {
-      final XFile? image = await picker.pickImage(source: ImageSource.camera);
+      final ImageSource source = isCamera ? ImageSource.camera : ImageSource.gallery;
+
+      final XFile? image = await picker.pickImage(source: source);
       if (image == null) return;
 
       final bytes = await image.readAsBytes();
@@ -585,7 +608,15 @@ class _WebResultViewState extends State<WebResultView> {
 
       await _controller.runJavaScript('''
         (function() {
-          const input = document.querySelector('input[type="file"]');
+          let input;
+          if (${isCamera ? 'true' : 'false'}) {
+            input = document.querySelector('input[type="file"][capture="environment"]') || document.querySelector('input[type="file"][capture="camera"]');
+          } else {
+            input = document.querySelector('input[type="file"]:not([capture])'); 
+          }
+          if (!input) { // fallback
+              input = document.querySelector('input[type="file"]'); 
+          }
           if (!input) return;
           
           const byteCharacters = atob("$base64");
@@ -646,6 +677,12 @@ class _WebResultViewState extends State<WebResultView> {
       const blob = blobMap.get(this.href);
       if (blob) {
         sendBlobToFlutter(blob);
+        // We MUST return and not call the original click to prevent WebView from trying to load the blob
+        // which causes ERR_UNKNOWN_URL_SCHEME and crashes the page to "Webpage not available"
+        return;
+      } else {
+        // If blob isn't in our map, try to fetch it and send it
+        fetch(this.href).then(r => r.blob()).then(b => sendBlobToFlutter(b));
         return;
       }
     }
@@ -665,6 +702,9 @@ class _WebResultViewState extends State<WebResultView> {
           if (blob) {
             sendBlobToFlutter(blob);
             return;
+          } else {
+             fetch(val).then(r => r.blob()).then(b => sendBlobToFlutter(b));
+             return;
           }
         }
         desc.set.call(this, val);
@@ -681,6 +721,9 @@ class _WebResultViewState extends State<WebResultView> {
       if (blob) {
         sendBlobToFlutter(blob);
         return;
+      } else {
+         fetch(url).then(r => r.blob()).then(b => sendBlobToFlutter(b));
+         return;
       }
     }
     return originalReplace.call(this, url);
@@ -695,10 +738,14 @@ class _WebResultViewState extends State<WebResultView> {
       if (blob) {
         sendBlobToFlutter(blob);
         return;
+      } else {
+         fetch(url).then(r => r.blob()).then(b => sendBlobToFlutter(b));
+         return;
       }
     }
     return originalAssign.call(this, url);
   };
+
 
   // ========== INTERCEPT WINDOW.OPEN ==========
   const originalWindowOpen = window.open;
@@ -709,6 +756,9 @@ class _WebResultViewState extends State<WebResultView> {
       if (blob) {
         sendBlobToFlutter(blob);
         return null;
+      } else {
+         fetch(url).then(r => r.blob()).then(b => sendBlobToFlutter(b));
+         return null;
       }
     }
     return originalWindowOpen.call(this, url, name, features);
@@ -727,8 +777,14 @@ class _WebResultViewState extends State<WebResultView> {
 
   // ========== HELPER: send blob to Flutter ==========
   function sendBlobToFlutter(blob) {
+    if (!blob) return;
+    console.log('Got Blob to send, size:', blob.size, 'type:', blob.type);
     const reader = new FileReader();
     reader.onloadend = () => {
+      if (reader.error) {
+        console.error('FileReader error: ', reader.error);
+        return;
+      }
       const base64 = reader.result.split(',')[1];
       if (window.BlobPDF) {
         BlobPDF.postMessage(base64);
@@ -825,11 +881,39 @@ class _WebResultViewState extends State<WebResultView> {
     if (input) {
       e.preventDefault();
       const isMultiple = input.hasAttribute('multiple');
+      const isCamera = input.getAttribute('capture') === 'environment' || input.getAttribute('capture') === 'camera';
       if (window.BlobPDF) {
-        BlobPDF.postMessage('FILE_PICKER:' + (isMultiple ? 'multiple' : 'single'));
+        BlobPDF.postMessage('FILE_PICKER:' + (isMultiple ? 'multiple' : 'single') + ':' + (isCamera ? 'camera' : 'gallery'));
       }
     }
   }, true);
+
+  // ========== jsPDF INTERCEPT ==========
+  if (typeof window !== 'undefined') {
+    let checkJsPdf = setInterval(() => {
+      if (window.jsPDF || (window.jspdf && window.jspdf.jsPDF)) {
+        clearInterval(checkJsPdf);
+        const jsPDFClass = window.jsPDF || window.jspdf.jsPDF;
+        if (jsPDFClass && jsPDFClass.prototype.save) {
+          const originalSave = jsPDFClass.prototype.save;
+          jsPDFClass.prototype.save = function(filename, options) {
+            console.log('📄 jsPDF.save intercepted for:', filename);
+            try {
+              const base64String = this.output('datauristring');
+              if (window.BlobPDF) {
+                // Remove the "data:application/pdf;base64," part
+                const cleanBase64 = base64String.split(',')[1];
+                window.BlobPDF.postMessage(cleanBase64);
+              }
+            } catch (err) {
+              console.error('jsPDF intercept failed:', err);
+              return originalSave.call(this, filename, options);
+            }
+          };
+        }
+      }
+    }, 500);
+  }
 
   // ========== DOWNLOAD BUTTON INTERCEPT ==========
   document.body.addEventListener('click', function(e) {
@@ -892,9 +976,18 @@ class _WebResultViewState extends State<WebResultView> {
 
   Future<void> _handleBlobContent(String base64) async {
     try {
-      final bytes = base64Decode(base64);
-      final dir = Platform.isAndroid ? await getTemporaryDirectory() : await getApplicationDocumentsDirectory();
-      final file = File('${dir.path}/Reporte_${DateTime.now().millisecondsSinceEpoch}.pdf');
+      // Sometimes base64 strings from standard JS output need padding or have "data:application/pdf;base64," prefix
+      String cleanBase64 = base64;
+      if (cleanBase64.contains(',')) {
+        cleanBase64 = cleanBase64.split(',').last;
+      }
+      
+      final bytes = base64Decode(cleanBase64.replaceAll('\n', '').replaceAll('\r', ''));
+      
+      final dir = Platform.isAndroid ? await getExternalStorageDirectory() : await getApplicationDocumentsDirectory();
+      final targetDir = dir ?? await getTemporaryDirectory();
+
+      final file = File('${targetDir.path}/Reporte_${DateTime.now().millisecondsSinceEpoch}.pdf');
       await file.writeAsBytes(bytes);
       await OpenFile.open(file.path);
     } catch (e) {
@@ -918,8 +1011,9 @@ class _WebResultViewState extends State<WebResultView> {
 
       if (Platform.isAndroid) {
         // Using app-specific directory to avoid storage permission issues
-        final dir = await getApplicationDocumentsDirectory();
-        savePath = '${dir.path}/Reporte_UltraScan_${DateTime.now().millisecondsSinceEpoch}.pdf';
+        final dir = await getExternalStorageDirectory();
+        final targetDir = dir ?? await getTemporaryDirectory();
+        savePath = '${targetDir.path}/Reporte_UltraScan_${DateTime.now().millisecondsSinceEpoch}.pdf';
       } else {
         final dir = await getApplicationDocumentsDirectory();
         savePath = '${dir.path}/Reporte_UltraScan_${DateTime.now().millisecondsSinceEpoch}.pdf';

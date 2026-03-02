@@ -11,7 +11,7 @@ import java.io.FileInputStream
 android {
     namespace = "com.jiangdg.demo"
     compileSdk = 36
-    ndkVersion = "29.0.14206865"
+    ndkVersion = "27.0.12077973"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8

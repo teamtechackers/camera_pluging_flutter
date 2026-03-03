@@ -112,8 +112,6 @@ class _ResultPageState extends State<ResultPage> {
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: Column(
                     children: [
-                      Text('analysis_summary'.tr, style: AppTextStyles.heading4.copyWith(color: AppColors.whiteColor, fontSize: 22)),
-
                       /// THIS Expanded is CRITICAL
                       Expanded(
                         child: Obx(
@@ -442,6 +440,12 @@ class _WebResultViewState extends State<WebResultView> {
           onWebResourceError: (WebResourceError error) {
             log("WebResourceError: ${error.description}, code: ${error.errorCode}, isMainFrame: ${error.isForMainFrame}");
 
+            // Ignore timeout or blob-related errors which occur when Flutter tries to fetch the blocked blob URL natively
+            if (error.description.contains('ERR_CONNECTION_TIMED_OUT') || error.errorCode == -8 || error.description.contains('blob:')) {
+              log("Ignoring blob timeout error: ${error.description}");
+              return;
+            }
+
             // Handle ERR_FILE_NOT_FOUND or any other main resource error immediately
             final bool isFatalError = error.isForMainFrame ?? true;
             final bool isFileNotFound = error.description.contains('ERR_FILE_NOT_FOUND') || error.errorCode == -6;
@@ -456,18 +460,9 @@ class _WebResultViewState extends State<WebResultView> {
               return;
             }
 
-            setState(() {
-              hasError = true;
-              errorMessage = error.description;
-            });
-
-            Future.delayed(const Duration(seconds: 2), () {
-              if (mounted && hasError) {
-                setState(() {
-                  _showPermanentError = true;
-                });
-              }
-            });
+            // For minor non-fatal resources we just log them.
+            // We removed the 2-second delay that was forcefully crashing the page for everything else.
+            log("Minor WebResourceError ignored: ${error.description}");
           },
 
           onHttpError: (error) {

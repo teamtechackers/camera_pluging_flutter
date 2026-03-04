@@ -53,6 +53,8 @@ class _ResultPageState extends State<ResultPage> {
 
   @override
   Widget build(BuildContext context) {
+    final bool isKeyboardOpen = MediaQuery.of(context).viewInsets.bottom > 0;
+
     return Scaffold(
       body: BackgroundContainer(
         child: Column(
@@ -60,25 +62,26 @@ class _ResultPageState extends State<ResultPage> {
             const SizedBox(height: 30),
 
             /// HEADER
-            Column(
-              children: [
-                Text('protocol'.tr, style: AppTextStyles.heading5),
-                Transform.translate(
-                  offset: const Offset(0, -8),
-                  child: Text('and_result'.tr, style: AppTextStyles.heading4.copyWith(color: AppColors.yellowColor)),
-                ),
-                const Ultrascan4d(),
-              ],
-            ),
+            if (!isKeyboardOpen)
+              Column(
+                children: [
+                  Text('protocol'.tr, style: AppTextStyles.heading5),
+                  Transform.translate(
+                    offset: const Offset(0, -4),
+                    child: Text('and_result'.tr, style: AppTextStyles.heading4.copyWith(color: AppColors.yellowColor)),
+                  ),
+                  const Ultrascan4d(),
+                ],
+              ),
 
             /// IMAGE
-            if (controller.analysisResponse.analysis?.annotatedImage != null)
+            if (!isKeyboardOpen && controller.analysisResponse.analysis?.annotatedImage != null)
               SizedBox(
-                height: 200,
+                height: 230,
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 0),
                   child: AspectRatio(
-                    aspectRatio: 4 / 3,
+                    aspectRatio: 4.4 / 3,
                     child: GestureDetector(
                       onTap: () {
                         // Fullscreen dialog pe image show karna
@@ -109,7 +112,7 @@ class _ResultPageState extends State<ResultPage> {
             if (controller.analysisResponse.analysis != null)
               Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
                   child: Column(
                     children: [
                       /// THIS Expanded is CRITICAL
@@ -132,10 +135,11 @@ class _ResultPageState extends State<ResultPage> {
               ),
 
             /// FIXED BUTTON
-            Padding(
-              padding: const EdgeInsets.fromLTRB(30, 10, 30, 30),
-              child: CustomTextButton(text: 'ask_a_question'.tr, onTap: () => _showAdvancedBottomSheet(context), paddingHorizontal: 40, paddingVertical: 11),
-            ),
+            if (!isKeyboardOpen)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(30, 10, 30, 30),
+                child: CustomTextButton(text: 'ask_a_question'.tr, onTap: () => _showAdvancedBottomSheet(context), paddingHorizontal: 40, paddingVertical: 11),
+              ),
           ],
         ),
       ),

@@ -141,6 +141,18 @@ class ScanController extends GetxController with WidgetsBindingObserver {
       final sdkInt = androidInfo.version.sdkInt;
       log('Android SDK Version: $sdkInt');
 
+      if (Platform.isIOS) {
+        final hasPermission = await requestGalleryPermission();
+        if (!hasPermission) {
+          showCustomSnackbar(
+            title: '',
+            message: 'grant_gallery_permission',
+            type: SnackbarType.warning,
+          );
+          return;
+        }
+      }
+
       // For Android 13+, image_picker usually handles things without manual photos permission
       // if using modern system picker. We'll still check but let it proceed if it fails.
       if (Platform.isAndroid && sdkInt < 33) {

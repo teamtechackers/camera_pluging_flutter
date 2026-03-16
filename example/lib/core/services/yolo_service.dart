@@ -34,12 +34,12 @@ class YoloService {
     try {
       _detectorInterpreter = await Interpreter.fromAsset(
         'assets/models/follicle_detector.tflite',
-        options: InterpreterOptions()..addDelegate(GpuDelegateV2()),
+        options: InterpreterOptions(), // ..addDelegate(GpuDelegateV2()),
       );
-
+  
       _segmentorInterpreter = await Interpreter.fromAsset(
         'assets/models/hair_segmentor.tflite',
-        options: InterpreterOptions()..addDelegate(GpuDelegateV2()),
+        options: InterpreterOptions(), // ..addDelegate(GpuDelegateV2()),
       );
     } catch (e) {
       rethrow;

@@ -156,17 +156,18 @@ void _showAdvancedBottomSheet(BuildContext context) {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
-                  BottomSheetCircular(
-                    height: size.width * 0.27,
-                    width: size.width * 0.27,
-                    icon: AppAssets.usbConnection,
-                    title: 'usb_conection'.tr,
-                    iconSize: 30,
-                    onTap: () async {
-                      await controller.pickImage();
-                      Get.back();
-                    },
-                  ),
+                  if (Platform.isAndroid)
+                    BottomSheetCircular(
+                      height: size.width * 0.27,
+                      width: size.width * 0.27,
+                      icon: AppAssets.usbConnection,
+                      title: 'usb_conection'.tr,
+                      iconSize: 30,
+                      onTap: () async {
+                        await controller.pickImage();
+                        Get.back();
+                      },
+                    ),
                   BottomSheetCircular(
                     height: size.width * 0.27,
                     width: size.width * 0.27,

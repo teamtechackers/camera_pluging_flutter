@@ -38,6 +38,8 @@ flutter:
       android:
         package: com.example.usb_camera_plugin
         pluginClass: UsbCameraPlugin
+      ios:
+        pluginClass: UsbCameraPlugin
 
   # To add assets to your plugin package, add an assets section, like this:
   # assets:

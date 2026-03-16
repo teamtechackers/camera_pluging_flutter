@@ -235,11 +235,20 @@ class ScanController extends GetxController with WidgetsBindingObserver {
       return;
     }
 
-    // Open USB camera and start a periodic non-blocking poll for captured image
-    await _openCamera();
+    if (Platform.isAndroid) {
+      // Open USB camera and start a periodic non-blocking poll for captured image
+      await _openCamera();
+    } else {
+      showCustomSnackbar(
+        title: 'Not Supported',
+        message: 'USB Camera is only supported on Android devices.',
+        type: SnackbarType.warning,
+      );
+    }
   }
 
   Future<void> _checkForCapturedImage() async {
+    if (!Platform.isAndroid) return;
     try {
       if (kDebugMode) {
         print('🔍 Checking for captured image...');
@@ -287,6 +296,7 @@ class ScanController extends GetxController with WidgetsBindingObserver {
   }
 
   Future<void> _initPlatformState() async {
+    if (!Platform.isAndroid) return;
     // Optional: we avoid forcing plugin init that might auto-open camera on some devices
     try {
       final v = await _usbCameraPlugin.getPlatformVersion();
@@ -297,6 +307,7 @@ class ScanController extends GetxController with WidgetsBindingObserver {
   }
 
   Future<void> _openCamera() async {
+    if (!Platform.isAndroid) return;
     try {
       await _usbCameraPlugin.openCamera();
 

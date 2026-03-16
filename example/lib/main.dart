@@ -1,4 +1,5 @@
 import 'package:get/get.dart';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
@@ -12,12 +13,30 @@ import 'core/constants/ui/app_colors.dart';
 import 'core/controllers/language_controller.dart';
 import 'core/translations/app_translations.dart';
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  WebViewPlatform.instance = AndroidWebViewPlatform();
-  await ApiClient().initialize();
-  Get.put(LanguageController());
-  runApp(const MyApp());
+import 'dart:async';
+
+void main() {
+  runZonedGuarded(() async {
+    print("🚀 APP_START: WidgetsFlutterBinding...");
+    WidgetsFlutterBinding.ensureInitialized();
+
+    if (Platform.isAndroid) {
+      print("🚀 APP_START: Setting Android WebView Platform...");
+      WebViewPlatform.instance = AndroidWebViewPlatform();
+    }
+
+    print("🚀 APP_START: ApiClient initialize...");
+    await ApiClient().initialize();
+
+    print("🚀 APP_START: Putting LanguageController...");
+    Get.put(LanguageController());
+
+    print("🚀 APP_START: Running MyApp...");
+    runApp(const MyApp());
+  }, (error, stack) {
+    print("❌ FATAL_INITIALIZATION_ERROR: $error");
+    print(stack);
+  });
 }
 
 Future<void> _precacheImages(BuildContext context) async {

@@ -31,8 +31,8 @@ android {
         applicationId = "com.app.ultrascan4d"
         minSdk = 24
         targetSdk = 35
-        versionCode = 4
-        versionName = "1.0.4"
+        versionCode = 6
+        versionName = "1.0.6"
         
         multiDexEnabled = true
         

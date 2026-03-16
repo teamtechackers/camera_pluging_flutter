@@ -421,9 +421,14 @@ class ScanController extends GetxController with WidgetsBindingObserver {
       // Rotate image according to EXIF (this uses native plugin)
       File fixedFile;
       try {
-        fixedFile = await FlutterExifRotation.rotateImage(
-          path: selectedImage.value!.path,
-        );
+        if (Platform.isAndroid) {
+          fixedFile = await FlutterExifRotation.rotateImage(
+            path: selectedImage.value!.path,
+          );
+        } else {
+          // Skip rotation on iOS for now to avoid potential native crashes
+          fixedFile = selectedImage.value!;
+        }
       } catch (e) {
         // If rotation fails, fall back to original
         log('Exif rotation failed, using original image: $e');

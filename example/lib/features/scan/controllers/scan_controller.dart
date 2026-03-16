@@ -135,19 +135,8 @@ class ScanController extends GetxController with WidgetsBindingObserver {
     try {
       isLoading.value = true;
       log('Starting gallery image selection...');
-      await Future.delayed(const Duration(milliseconds: 50));
-
-      if (Platform.isIOS) {
-        final hasPermission = await requestGalleryPermission();
-        if (!hasPermission) {
-          showCustomSnackbar(
-            title: '',
-            message: 'grant_gallery_permission',
-            type: SnackbarType.warning,
-          );
-          return;
-        }
-      }
+      // Increased delay to ensure UI is ready for the native transition
+      await Future.delayed(const Duration(milliseconds: 200));
 
       if (Platform.isAndroid) {
         final androidInfo = await DeviceInfoPlugin().androidInfo;

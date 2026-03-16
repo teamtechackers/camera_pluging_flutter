@@ -137,10 +137,6 @@ class ScanController extends GetxController with WidgetsBindingObserver {
       log('Starting gallery image selection...');
       await Future.delayed(const Duration(milliseconds: 50));
 
-      final androidInfo = await DeviceInfoPlugin().androidInfo;
-      final sdkInt = androidInfo.version.sdkInt;
-      log('Android SDK Version: $sdkInt');
-
       if (Platform.isIOS) {
         final hasPermission = await requestGalleryPermission();
         if (!hasPermission) {
@@ -153,17 +149,23 @@ class ScanController extends GetxController with WidgetsBindingObserver {
         }
       }
 
-      // For Android 13+, image_picker usually handles things without manual photos permission
-      // if using modern system picker. We'll still check but let it proceed if it fails.
-      if (Platform.isAndroid && sdkInt < 33) {
-        final status = await Permission.storage.status;
-        if (status.isDenied) {
-          log('Storage permission denied, requesting...');
-          final result = await Permission.storage.request();
-          if (result.isPermanentlyDenied) {
-            log('Storage permission permanently denied');
-            openAppSettings();
-            return;
+      if (Platform.isAndroid) {
+        final androidInfo = await DeviceInfoPlugin().androidInfo;
+        final sdkInt = androidInfo.version.sdkInt;
+        log('Android SDK Version: $sdkInt');
+
+        // For Android 13+, image_picker usually handles things without manual photos permission
+        // if using modern system picker. We'll still check but let it proceed if it fails.
+        if (sdkInt < 33) {
+          final status = await Permission.storage.status;
+          if (status.isDenied) {
+            log('Storage permission denied, requesting...');
+            final result = await Permission.storage.request();
+            if (result.isPermanentlyDenied) {
+              log('Storage permission permanently denied');
+              openAppSettings();
+              return;
+            }
           }
         }
       }

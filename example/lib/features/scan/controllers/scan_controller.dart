@@ -114,9 +114,9 @@ class ScanController extends GetxController with WidgetsBindingObserver {
       final status = await Permission.photos.status;
       if (status.isDenied) {
         final result = await Permission.photos.request();
-        return result.isGranted;
+        return result.isGranted || result.isLimited;
       }
-      return status.isGranted;
+      return status.isGranted || status.isLimited;
     }
 
     return true;
@@ -188,8 +188,8 @@ class ScanController extends GetxController with WidgetsBindingObserver {
     } catch (e) {
       log('Failed to select image from gallery: $e');
       showCustomSnackbar(
-        title: '',
-        message: 'failed_select_image',
+        title: 'Selection Error',
+        message: 'Error: ${e.toString()}',
         type: SnackbarType.error,
       );
     } finally {

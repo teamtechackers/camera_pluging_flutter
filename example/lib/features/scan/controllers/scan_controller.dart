@@ -133,52 +133,66 @@ class ScanController extends GetxController with WidgetsBindingObserver {
 
   Future<void> pickImageFromGallery() async {
     try {
-      isLoading.value = true;
-      log('Starting gallery image selection...');
-      // Increased delay to ensure UI is ready for the native transition
-      await Future.delayed(const Duration(milliseconds: 200));
+      print('🚀 SYSTEM_LOG: pickImageFromGallery started');
 
-      if (Platform.isAndroid) {
+      // 1. Check and Request Permission (As requested by user)
+      if (Platform.isIOS) {
+        var status = await Permission.photos.status;
+        print('🚀 SYSTEM_LOG: Current iOS Photos status: $status');
+        
+        if (status.isDenied) {
+          print('🚀 SYSTEM_LOG: Permission denied, requesting...');
+          status = await Permission.photos.request();
+          print('🚀 SYSTEM_LOG: Request result: $status');
+        }
+
+        if (!status.isGranted && !status.isLimited) {
+          print('🚀 SYSTEM_LOG: Permission NOT granted/limited. Aborting.');
+          if (status.isPermanentlyDenied) {
+            openAppSettings();
+          }
+          return;
+        }
+      } else if (Platform.isAndroid) {
         final androidInfo = await DeviceInfoPlugin().androidInfo;
         final sdkInt = androidInfo.version.sdkInt;
-        log('Android SDK Version: $sdkInt');
-
-        // For Android 13+, image_picker usually handles things without manual photos permission
-        // if using modern system picker. We'll still check but let it proceed if it fails.
+        
         if (sdkInt < 33) {
-          final status = await Permission.storage.status;
+          var status = await Permission.storage.status;
           if (status.isDenied) {
-            log('Storage permission denied, requesting...');
-            final result = await Permission.storage.request();
-            if (result.isPermanentlyDenied) {
-              log('Storage permission permanently denied');
-              openAppSettings();
-              return;
-            }
+             status = await Permission.storage.request();
           }
+          if (!status.isGranted) return;
         }
       }
 
-      log('Launching ImagePicker...');
-      final image = await _picker.pickImage(
+      // 2. Open Gallery
+      isLoading.value = true;
+      
+      // Crucial for iOS Simulators: Ensure the BottomSheet/Menu is completely gone
+      // before triggering the native view hierarchy change.
+      if (Platform.isIOS) {
+        print('🚀 SYSTEM_LOG: Waiting for UI stability...');
+        await Future.delayed(const Duration(milliseconds: 1000));
+      }
+
+      print('🚀 SYSTEM_LOG: Calling native ImagePicker...');
+      final XFile? image = await _picker.pickImage(
         source: ImageSource.gallery,
-        maxWidth: 1920,
-        maxHeight: 1080,
-        imageQuality: 85,
+        // Using original quality for better native stability on simulator
       );
 
+      print('🚀 SYSTEM_LOG: ImagePicker returned. Success? ${image != null}');
+
       if (image != null) {
-        log('Image selected: ${image.path}');
         selectedImage.value = File(image.path);
         isFromUsb.value = false;
-      } else {
-        log('No image selected (user cancelled)');
       }
     } catch (e) {
-      log('Failed to select image from gallery: $e');
+      print('❌ ERROR in pickImageFromGallery: $e');
       showCustomSnackbar(
-        title: 'Selection Error',
-        message: 'Error: ${e.toString()}',
+        title: 'Error',
+        message: e.toString(),
         type: SnackbarType.error,
       );
     } finally {

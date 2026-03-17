@@ -1,8 +1,8 @@
-import 'dart:developer';
 import 'dart:io';
 
 import 'package:get/get.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:usb_camera_plugin_example/core/constants/index.dart';
 import 'package:usb_camera_plugin_example/features/scan/widgets/bottomsheet_cicular.dart';
 
@@ -39,7 +39,6 @@ class _ScanPageState extends State<ScanPage> {
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
-    log(controller.selectedImage.value.toString());
     return Obx(
       () => Scaffold(
         floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,

@@ -3,36 +3,36 @@ PODS:
     - Flutter
   - connectivity_plus (0.0.1):
     - Flutter
-  - DartCvIOS (4.12.0.0):
-    - DartCvIOS/calib3d (= 4.12.0.0)
-    - DartCvIOS/contrib (= 4.12.0.0)
-    - DartCvIOS/core (= 4.12.0.0)
-    - DartCvIOS/features2d (= 4.12.0.0)
-    - DartCvIOS/imgproc (= 4.12.0.0)
-    - DartCvIOS/objdetect (= 4.12.0.0)
-    - DartCvIOS/photo (= 4.12.0.0)
-    - DartCvIOS/stitching (= 4.12.0.0)
-    - DartCvIOS/video (= 4.12.0.0)
-  - DartCvIOS/calib3d (4.12.0.0):
+  - DartCvIOS (4.12.0.2):
+    - DartCvIOS/calib3d (= 4.12.0.2)
+    - DartCvIOS/contrib (= 4.12.0.2)
+    - DartCvIOS/core (= 4.12.0.2)
+    - DartCvIOS/features2d (= 4.12.0.2)
+    - DartCvIOS/imgproc (= 4.12.0.2)
+    - DartCvIOS/objdetect (= 4.12.0.2)
+    - DartCvIOS/photo (= 4.12.0.2)
+    - DartCvIOS/stitching (= 4.12.0.2)
+    - DartCvIOS/video (= 4.12.0.2)
+  - DartCvIOS/calib3d (4.12.0.2):
     - DartCvIOS/core
-  - DartCvIOS/contrib (4.12.0.0):
+  - DartCvIOS/contrib (4.12.0.2):
     - DartCvIOS/core
-  - DartCvIOS/core (4.12.0.0)
-  - DartCvIOS/dnn (4.12.0.0):
+  - DartCvIOS/core (4.12.0.2)
+  - DartCvIOS/dnn (4.12.0.2):
     - DartCvIOS/core
-  - DartCvIOS/features2d (4.12.0.0):
+  - DartCvIOS/features2d (4.12.0.2):
     - DartCvIOS/core
-  - DartCvIOS/imgproc (4.12.0.0):
+  - DartCvIOS/imgproc (4.12.0.2):
     - DartCvIOS/core
-  - DartCvIOS/objdetect (4.12.0.0):
+  - DartCvIOS/objdetect (4.12.0.2):
     - DartCvIOS/core
-  - DartCvIOS/photo (4.12.0.0):
+  - DartCvIOS/photo (4.12.0.2):
     - DartCvIOS/core
-  - DartCvIOS/stitching (4.12.0.0):
+  - DartCvIOS/stitching (4.12.0.2):
     - DartCvIOS/core
-  - DartCvIOS/video (4.12.0.0):
+  - DartCvIOS/video (4.12.0.2):
     - DartCvIOS/core
-  - DartCvIOS/videoio (4.12.0.0):
+  - DartCvIOS/videoio (4.12.0.2):
     - DartCvIOS/core
   - device_info_plus (0.0.1):
     - Flutter
@@ -66,9 +66,9 @@ PODS:
   - open_file_ios (0.0.1):
     - Flutter
   - opencv_dart (0.0.1):
-    - DartCvIOS (= 4.12.0.0)
-    - DartCvIOS/dnn (= 4.12.0.0)
-    - DartCvIOS/videoio (= 4.12.0.0)
+    - DartCvIOS (= 4.12.0.2)
+    - DartCvIOS/dnn (= 4.12.0.2)
+    - DartCvIOS/videoio (= 4.12.0.2)
     - Flutter
   - path_provider_foundation (0.0.1):
     - Flutter
@@ -182,7 +182,7 @@ EXTERNAL SOURCES:
 SPEC CHECKSUMS:
   camera_avfoundation: adb0207d868b2d873e895371d88448399ab78d87
   connectivity_plus: 2a701ffec2c0ae28a48cf7540e279787e77c447d
-  DartCvIOS: 3b4638e0f24b5f48a25378815618b9f8c1e87ad4
+  DartCvIOS: 31615ff863f0fc709aee9b93dc3afa3500d35ba7
   device_info_plus: 97af1d7e84681a90d0693e63169a5d50e0839a0d
   Flutter: e0871f40cf51350855a761d2e70bf5af5b9b5de7
   flutter_exif_rotation: de6b54e8bd54a687f28d6397d1a890391de41111
@@ -192,7 +192,7 @@ SPEC CHECKSUMS:
   libwebp: 02b23773aedb6ff1fd38cec7a77b81414c6842a8
   Mantle: c5aa8794a29a022dfbbfc9799af95f477a69b62d
   open_file_ios: 461db5853723763573e140de3193656f91990d9e
-  opencv_dart: 6a43b0c17bf70cb6b0c87fc182efe0c54cc19b4f
+  opencv_dart: 02eb3e5bc0e22de03c63b68c6bd7b156ea4341fb
   path_provider_foundation: 2b6b4c569c0fb62ec74538f866245ac84301af46
   permission_handler_apple: 9878588469a2b0d0fc1e048d9f43605f92e6cec2
   SDWebImage: e9fc87c1aab89a8ab1bbd74eba378c6f53be8abf
@@ -205,6 +205,6 @@ SPEC CHECKSUMS:
   usb_camera_plugin: 758f0e63e1acb948971af92cf5907c705ce13ea7
   webview_flutter_wkwebview: a4af96a051138e28e29f60101d094683b9f82188
 
-PODFILE CHECKSUM: 0e6d93f12933f1c25e7fc5f44429981f1915f9bc
+PODFILE CHECKSUM: ff6a9c258efee9153d6c1cf67a840f07ff9a0284
 
 COCOAPODS: 1.16.2

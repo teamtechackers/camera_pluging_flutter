@@ -167,10 +167,12 @@ class ScanController extends GetxController with WidgetsBindingObserver {
       }
 
       // 2. Open Gallery
-      isLoading.value = true;
+      // On iOS Simulator, having a loading overlay active can sometimes interfere with native picker dismissal
+      if (Platform.isAndroid) {
+        isLoading.value = true;
+      }
       
       // Crucial for iOS Simulators: Ensure the BottomSheet/Menu is completely gone
-      // before triggering the native view hierarchy change.
       if (Platform.isIOS) {
         print('🚀 SYSTEM_LOG: Waiting for UI stability...');
         await Future.delayed(const Duration(milliseconds: 1000));
@@ -179,14 +181,18 @@ class ScanController extends GetxController with WidgetsBindingObserver {
       print('🚀 SYSTEM_LOG: Calling native ImagePicker...');
       final XFile? image = await _picker.pickImage(
         source: ImageSource.gallery,
-        // Using original quality for better native stability on simulator
+        requestFullMetadata: false, // Fix for iOS Simulator hangs
       );
 
-      print('🚀 SYSTEM_LOG: ImagePicker returned. Success? ${image != null}');
+      print('🚀 SYSTEM_LOG: ImagePicker returned. Result null? ${image == null}');
 
       if (image != null) {
+        isLoading.value = true; // Show loading while processing the selected file
         selectedImage.value = File(image.path);
         isFromUsb.value = false;
+        print('✅ SYSTEM_LOG: Image path: ${image.path}');
+      } else {
+        print('⚠️ SYSTEM_LOG: Picker returned NULL (User cancelled or simulator failed)');
       }
     } catch (e) {
       print('❌ ERROR in pickImageFromGallery: $e');

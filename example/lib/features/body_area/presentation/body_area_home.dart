@@ -127,6 +127,7 @@ class BodyAreaHome extends StatelessWidget {
                         }
 
                         final prefs = await SharedPreferences.getInstance();
+                        prefs.setString('saved_mac_address', '4E:4F:DA:1C:21:11');
                         final mac = prefs.getString('saved_mac_address');
                         if (mac == null || mac.isEmpty) {
                           Get.toNamed(AppPages.settingPage, arguments: true);

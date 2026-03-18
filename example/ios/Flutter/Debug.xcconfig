@@ -2,4 +2,4 @@
 #include "Generated.xcconfig"
 
 // Force allow arm64 on simulator for Apple Silicon Macs
-EXCLUDED_ARCHS[sdk=iphonesimulator*] = i386
+EXCLUDED_ARCHS[sdk=iphonesimulator*] = i386 arm64
